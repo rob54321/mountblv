@@ -3,6 +3,118 @@
 # the drives can also be unmounted with the correct switches
 
 use Getopt::Std;
+
+# sub to make lists of mounted devices.
+# values are read from the files /tmp/veradrivelist, /tmp/veradirlist, /tmp/bitlockermounted
+sub listmounteddev {
+	our @vmounts = ();
+	our @vmountlabels = ();
+	our %blmounts = ();
+
+	# make list of mounted vera mount points
+	if (open (VERALIST, "/tmp/veralist")) {
+		while (my $line = <VERALIST>) {
+			chomp ($line);
+			push @vmounts, [split /:/, $line];
+		}
+		# close
+		close(VERALIST);
+	}
+
+	# make list of vmountlabels
+	if (open(VDRIVELIST, "/tmp/veradrivelist")) {
+		while (my $vlabel = <VDRIVELIST>) {
+			chomp($vlabel);
+			push @vmountlabels, $vlabel;
+		}
+		# close
+		close(VDRIVELIST);
+	}
+	# make a list of bit locker drives
+	if ( open (BLOCKMOUNTED, "/tmp/bitlockermounted")) {
+		while (my $line = <BLOCKMOUNTED>) {
+			chomp($line);
+			my ($mdir, $encfile, $created) = split(/:/, $line);
+			# add elements to hash mdir => [encrypted file, creatation status]
+			$blmounts{$mdir} = [$encfile, $created];
+		}
+		# close
+		close (BLOCKMOUNTED);
+	}
+	######################################################
+	# testing #
+	#foreach my $line (@vmounts) {
+	#	print "line $line\n";
+	#	print "$line->[0]:$line->[1]:$line->[2]:$line->[3]\n";
+	}
+	#print "vmountlabels @vmountlabels\n";
+	#foreach my $mdir (keys(%blmounts)) {
+	#	print "mdir $mdir: encfile $blmounts{$mdir}->[0]: created $blmounts{$mdir}->[1]\n";
+	#}
+	######################################################
+}
+	
+# sub umountparser($opt_u) parses the input argument
+# and determines what to unmount
+sub umountparser {
+	# get arguments
+	my @ulist = @_;
+
+	# make a list of mounted drives, vera mountpoints and bitlocker mountpoints
+	listmounteddev();
+exit 0;
+	# if all is passed unmount all.
+	if ($ulist[0] eq "all") {
+		system("veracrypt -d");
+		# remove all vera mtpts and delete file
+		foreach my $vmtpt (@vmounts) {
+			rmdir $vmtpt;
+			print "removed $vmtpt\n";
+		}
+		unlink "/tmp/veradirlist";
+		print "\n";
+
+		#un mount all drives that were mounted
+		# with vera containers
+		# and delete file
+		foreach my $label (@vmountlabels) {
+			system("umount $label");
+			print "umounted vera $label\n";
+		}
+		unlink "/tmp/veradrivelist";
+		print "\n";
+
+		# un mount all bit locker drives
+		# first the mountpoint, then the encrypted file
+		foreach my $dmtpt (keys(%blmounts)) {
+			system("umount $dmtpt");
+			print "umounted $dmtpt\n";
+			if ($blmounts{$dmtpt}->[1] eq "created") {
+				rmdir ("$dmtpt");
+				print "removed $dmtpt\n";
+			}
+			system("umount $blmounts{$dmtpt}->[0]");
+			print "umounted $blmounts{$dmtpt}->[0]\n";
+			rmdir ("$blmounts{$dmtpt}->[0]");
+			print "removed $blmounts{$dmtpt}->[0]\n";
+		}
+		unlink "/tmp/bitlockermounted";
+		print "\n";
+	} else {
+		# a list was given to un mount
+		# umount each element in the list
+		# if the element is a label, umount all vera files
+		# unmount disk only if all vera containers for that disk are unmounted
+		foreach $arg (@ulist) {
+			# is $arg a vera mtpt or vera container or disk label of bitlocker mountpoint
+			if (grep /^$arg$/, @vmounts) {
+				print "\n";
+			}
+		}
+	}	
+}		
+	
+
 # sub to get the disk label from the vera mountpoint for attached vera disks
 # the label and vera file are returned or undef if the label or verafile is not found
 # the call getlabelvfilefromvmtpt(vera container)
@@ -170,6 +282,7 @@ sub mountveracontainer {
 			# mount vera file
 			# add vera mountpoint for removal later
 			print VDIRLIST "$veramtpt\n";
+			print VERALIST "$dlabel:$vdevice{$dlabel}->[0]:$verafile:$veramtpt\n";
 
 			# mkdir mountpoint if it does not exist
 			if (! -d $veramtpt) {
@@ -230,7 +343,9 @@ sub mountvera {
 	# string veralist = all | list of vera mountpoints
 	my @veralist = split /\s+/, $_[0];
 
-	#
+	# file for vera files: dlabel:dmountpt:verafile:veramtpt
+	open (VERALIST, ">>/tmp/veralist");
+
 	# list of created vera directories so they can be removed
 	open (VDIRLIST, ">>/tmp/veradirlist");
 
@@ -280,6 +395,7 @@ sub mountvera {
 	}
 	close(VDRIVELIST);
 	close(VDIRLIST);
+	close(VERALIST);
 }
 
 
@@ -495,5 +611,7 @@ if($opt_v) {
 if ($opt_u) {
 	# unmount bitlocker drives and / or vera containers.
 	# if the disk was mounted by this programme then it will be unmounted as well
-	print "not implemented yet\n";
+	# the argument can be all or
+	# any one of: veramtpt, vera container, disk label, bit locker mountpoint
+	umountparser($opt_u);
 }
