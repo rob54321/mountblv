@@ -46,7 +46,7 @@ sub listmounteddev {
 	#foreach my $line (@vmounts) {
 	#	print "line $line\n";
 	#	print "$line->[0]:$line->[1]:$line->[2]:$line->[3]\n";
-	}
+	#}
 	#print "vmountlabels @vmountlabels\n";
 	#foreach my $mdir (keys(%blmounts)) {
 	#	print "mdir $mdir: encfile $blmounts{$mdir}->[0]: created $blmounts{$mdir}->[1]\n";
@@ -62,16 +62,16 @@ sub umountparser {
 
 	# make a list of mounted drives, vera mountpoints and bitlocker mountpoints
 	listmounteddev();
-exit 0;
+
 	# if all is passed unmount all.
 	if ($ulist[0] eq "all") {
 		system("veracrypt -d");
-		# remove all vera mtpts and delete file
-		foreach my $vmtpt (@vmounts) {
-			rmdir $vmtpt;
-			print "removed $vmtpt\n";
+		# remove all vera mtpts
+		foreach my $aref (@vmounts) {
+			rmdir $aref->[3];
+			print "removed $aref->[3]\n";
 		}
-		unlink "/tmp/veradirlist";
+		unlink "/tmp/veralist";
 		print "\n";
 
 		#un mount all drives that were mounted
@@ -281,7 +281,6 @@ sub mountveracontainer {
 		if ( $mtab !~ /$veramtpt/) {
 			# mount vera file
 			# add vera mountpoint for removal later
-			print VDIRLIST "$veramtpt\n";
 			print VERALIST "$dlabel:$vdevice{$dlabel}->[0]:$verafile:$veramtpt\n";
 
 			# mkdir mountpoint if it does not exist
@@ -346,9 +345,6 @@ sub mountvera {
 	# file for vera files: dlabel:dmountpt:verafile:veramtpt
 	open (VERALIST, ">>/tmp/veralist");
 
-	# list of created vera directories so they can be removed
-	open (VDIRLIST, ">>/tmp/veradirlist");
-
 	# file for mounted drives with veracrypt on them
 	# so they can be unmounted later
 	open (VDRIVELIST, ">>/tmp/veradrivelist");
@@ -394,7 +390,6 @@ sub mountvera {
 		}
 	}
 	close(VDRIVELIST);
-	close(VDIRLIST);
 	close(VERALIST);
 }
 
