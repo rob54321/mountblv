@@ -7,25 +7,28 @@ use Getopt::Std;
 # sub to make lists of mounted devices.
 # values are read from the files /tmp/veradrivelist, /tmp/veradirlist, /tmp/bitlockermounted
 sub listmounteddev {
-	our @vmounts = ();
-	our @vmountlabels = ();
+	# each (key,value) of %vmounts is dlabel => {vfile => vmtpt}
+	our %vmounts = ();
+	our @vdiskmounts = ();
 	our %blmounts = ();
 
-	# make list of mounted vera mount points
+	# make a hash of vera mounts: dlabel => {vfile => vmtpt} for each pair
 	if (open (VERALIST, "/tmp/veralist")) {
 		while (my $line = <VERALIST>) {
 			chomp ($line);
-			push @vmounts, [split /:/, $line];
+			my ($dlabel, $dmtpt, $verafile, $veramtpt) = split /:/, $line;
+			$vmounts{$dlabel}->{$verafile} = $veramtpt;
 		}
 		# close
 		close(VERALIST);
 	}
 
-	# make list of vmountlabels
+	# make list of vdiskmounts
+	# these are the disks mounted by mbl.pl to mount vera containers
 	if (open(VDRIVELIST, "/tmp/veradrivelist")) {
 		while (my $vlabel = <VDRIVELIST>) {
 			chomp($vlabel);
-			push @vmountlabels, $vlabel;
+			push @vdiskmounts, $vlabel;
 		}
 		# close
 		close(VDRIVELIST);
@@ -43,11 +46,14 @@ sub listmounteddev {
 	}
 	######################################################
 	# testing #
-	#foreach my $line (@vmounts) {
-	#	print "line $line\n";
-	#	print "$line->[0]:$line->[1]:$line->[2]:$line->[3]\n";
+	#foreach my $dlabel (keys(%vmounts)) {
+	#	print "$dlabel: $vmounts{$dlabel}\n";
+	#	while (($verafile, $vmtpt) = each (%{$vmounts{$dlabel}})) {
+	#		print "dlabel $dlabel $verafile $vmtpt\n";
+	#	}
 	#}
-	#print "vmountlabels @vmountlabels\n";
+	#
+	#print "vdiskmounts @vdiskmounts\n";
 	#foreach my $mdir (keys(%blmounts)) {
 	#	print "mdir $mdir: encfile $blmounts{$mdir}->[0]: created $blmounts{$mdir}->[1]\n";
 	#}
@@ -58,7 +64,7 @@ sub listmounteddev {
 # and determines what to unmount
 sub umountparser {
 	# get arguments
-	my @ulist = @_;
+	my @ulist = split /\s+/, $_[0];
 
 	# make a list of mounted drives, vera mountpoints and bitlocker mountpoints
 	listmounteddev();
@@ -67,9 +73,11 @@ sub umountparser {
 	if ($ulist[0] eq "all") {
 		system("veracrypt -d");
 		# remove all vera mtpts
-		foreach my $aref (@vmounts) {
-			rmdir $aref->[3];
-			print "removed $aref->[3]\n";
+		foreach my $dlabel (keys(%vmounts)) {
+			foreach my $verafile (keys(%{$vmounts{$dlabel}})) {
+				rmdir "$vmounts{$dlabel}->{$verafile}";
+				print "removed $vmounts{$dlabel}->{$verafile}\n";
+			}
 		}
 		unlink "/tmp/veralist";
 		print "\n";
@@ -77,9 +85,9 @@ sub umountparser {
 		#un mount all drives that were mounted
 		# with vera containers
 		# and delete file
-		foreach my $label (@vmountlabels) {
-			system("umount $label");
-			print "umounted vera $label\n";
+		foreach my $dmtpt (@vdiskmounts) {
+			system("umount $dmtpt");
+			print "umounted vera $dmtpt\n";
 		}
 		unlink "/tmp/veradrivelist";
 		print "\n";
@@ -106,12 +114,31 @@ sub umountparser {
 		# if the element is a label, umount all vera files
 		# unmount disk only if all vera containers for that disk are unmounted
 		foreach $arg (@ulist) {
-			# is $arg a vera mtpt or vera container or disk label of bitlocker mountpoint
-			if (grep /^$arg$/, @vmounts) {
-				print "\n";
+			# is $arg a vera mtpt or vera container or disk label of bitlocker mountpoint?
+			print "arg $arg\n";
+			if (grep /^$arg$/, @attachedveramtpts) {
+				# arg is a vera mount point, unmount
+				# un mount if not mounted
+				if ($mtab =~ /$arg/) {
+					system("veracrypt -d $arg");
+					rmdir "$arg";
+					# get the label and vera file
+					my ($dlabel, $verafile) = getlabelvfilefromvmtpt($arg);
+					print "umounted $verafile mounted at $arg\n";
+				}
+			} elsif (grep /^$arg$/, @attachedverafiles) {
+				# arg is a verafile
+				# un mount if not mounted
+				my $dlabel = getlabelfromvfile($arg);
+				my $vmtpt = $vmounts{$dlabel}->{$arg};
+				if ($mtab =~ /$vmtpt/) {
+					system("veracrypt -d $vmtpt");
+					rmdir "$vmtpt";
+					print "umounted $arg mounted at $vmtpt\n";
+				}
 			}
-		}
-	}	
+		} # end foreach
+	} # end if else
 }		
 	
 
@@ -307,7 +334,7 @@ sub makeattachedveralists {
 	# declare global empty lists for the values
 	our @attachedveralabels = ();
 	our @attachedverafiles = ();
-	our @attachedveramtpoints = ();
+	our @attachedveramtpts = ();
 
 	# make a list of attached devices labels if they contain vera containers
 	my @vlist = `lsblk -o LABEL`;
@@ -324,7 +351,7 @@ sub makeattachedveralists {
 		push @attachedverafiles, @vfilelist;
 
 		foreach my $mtptref (values(%{$vdevice{$label}->[1]})) {
-			push @attachedveramtpoints, $mtptref->[0];
+			push @attachedveramtpts, $mtptref->[0];
 		}
 	}
 }
@@ -378,7 +405,7 @@ sub mountvera {
 				#print "arg is a verafile label = $label: verafile = $arg\n";
 				mountveracontainer($label, $arg);
 
-			} elsif (grep(/^$arg$/, @attachedveramtpoints)) {
+			} elsif (grep(/^$arg$/, @attachedveramtpts)) {
 				#argument is a vera mount point
 				my ($label, $verafile) = getlabelvfilefromvmtpt($arg);
 				#print "arg is a vmtpt label = $label: verafile = $verafile\n";
@@ -608,5 +635,6 @@ if ($opt_u) {
 	# if the disk was mounted by this programme then it will be unmounted as well
 	# the argument can be all or
 	# any one of: veramtpt, vera container, disk label, bit locker mountpoint
+	makeattachedveralists();
 	umountparser($opt_u);
 }
