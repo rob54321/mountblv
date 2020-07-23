@@ -8,19 +8,20 @@
 
 # unmount all veracrypt files and delete the created directories
 system("veracrypt -d");
-
-if (open (VDIRLIST, "/tmp/veradirlist")) {
+# the file /tmp/veralist has lines: dlabel:dmtpt:vfile:vmtpt
+if (open (VERALIST, "/tmp/veralist")) {
 	# rmdir dir from each line
-	while ($line = <VDIRLIST>) {
+	while (my $line = <VERALIST>) {
 		chomp ($line);
-		print "removing directory $line\n";
-		rmdir $line;
+		my $vmtpt = (split /:/, $line)[3];
+		print "removing directory $vmtpt\n";
+		rmdir $vmtpt;
 	}
 	# for spacing
 	print "\n";
 	# close and delete file
-	close(VDIRLIST);
-	unlink("/tmp/veradirlist");
+	close(VERALIST);
+	unlink("/tmp/veralist");
 }
 
 # unmount all disk drives that were mounted for vera files
