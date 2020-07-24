@@ -37,9 +37,9 @@ sub listmounteddev {
 	if ( open (BLOCKMOUNTED, "/tmp/bitlockermounted")) {
 		while (my $line = <BLOCKMOUNTED>) {
 			chomp($line);
-			my ($mdir, $encfile, $created) = split(/:/, $line);
+			my ($mdir, $encmount, $created) = split(/:/, $line);
 			# add elements to hash mdir => [encrypted file, creatation status]
-			$blmounts{$mdir} = [$encfile, $created];
+			$blmounts{$mdir} = [$encmount, $created];
 		}
 		# close
 		close (BLOCKMOUNTED);
@@ -60,9 +60,9 @@ sub listmounteddev {
 	######################################################
 }
 	
-# sub umountparser($opt_u) parses the input argument
+# sub umount($opt_u) parses the input argument
 # and determines what to unmount
-sub umountparser {
+sub umount {
 	# get arguments
 	my @ulist = split /\s+/, $_[0];
 
@@ -125,6 +125,9 @@ sub umountparser {
 					# get the label and vera file
 					my ($dlabel, $verafile) = getlabelvfilefromvmtpt($arg);
 					print "umounted $verafile mounted at $arg\n";
+					# delete line in /tmp/veralist with vera mtpt in it
+					system("sed -i -e '/$arg/d' /tmp/veralist");
+					# check if disk with vera container should be unmounted
 				}
 			} elsif (grep /^$arg$/, @attachedverafiles) {
 				# arg is a verafile
@@ -135,7 +138,40 @@ sub umountparser {
 					system("veracrypt -d $vmtpt");
 					rmdir "$vmtpt";
 					print "umounted $arg mounted at $vmtpt\n";
+					print "removed $vmtpt\n";
+					# delete line in veralist with $verafile in it
+					system("sed -i -e '/$arg/d' /tmp/veralist");
+					# check if disk with vera container should be unmounted
 				}
+			} elsif (exists $vmounts{$arg}) {
+				# arg is a disk label. umount all it's vera containers
+				# and umount the disk if mbl.pl mounted it
+				foreach my $verafile (keys(%{$vmounts{$arg}})) {
+					if ($mtab =~ /$vmounts{$arg}->{$verafile}/) {
+						system("veracrypt -d $verafile");
+						rmdir "$vmounts{$arg}->{$verafile}";
+						print "umounted $verafile at $vmounts{$arg}->{$verafile}\n";
+						print "removed $vmounts{$arg}->{$verafile}\n";
+						# delete line in veralist with $verafile in it
+						system("sed -i -e '/$verafile/d' /tmp/veralist");
+						# check if disk can be unmounted
+					}
+				}
+			} elsif (exists $blmounts{$arg}) {
+				# arg is the mount point of a mounted bitlocker drive
+				# unmount mountpoint then encrypted file
+				system("umount $arg");
+				print "umounted $arg\n";
+				if ($blmounts{$arg}->[1] eq "created") {
+					# mbl.pl create directory, remove it
+					rmdir "$arg";
+					print "removed $arg\n";
+				}
+				# unmount encrypted file and remove directory
+				system("umount $blmounts{$arg}->[0]");
+				print "removed $blmounts{$arg}->[0]";
+				# delete line with mountpoint in /tmp/bitlockermounted
+				system("sed -i -e '/$arg/d' /tmp/bitlockermounted");
 			}
 		} # end foreach
 	} # end if else
@@ -636,5 +672,5 @@ if ($opt_u) {
 	# the argument can be all or
 	# any one of: veramtpt, vera container, disk label, bit locker mountpoint
 	makeattachedveralists();
-	umountparser($opt_u);
+	umount($opt_u);
 }
