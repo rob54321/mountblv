@@ -374,7 +374,6 @@ sub mountveracontainer {
 
 		# mtab has been altered and must be read again
 		$mtab = `cat /etc/mtab`;
-
 	}
 
 	# if the file exists and is not mounted, mount it
@@ -388,8 +387,10 @@ sub mountveracontainer {
 			if (! -d $veramtpt) {
 				mkdir $veramtpt;
 			}		
-                	system("veracrypt -k \"\" --fs-options=uid=robert,gid=robert,umask=007 --pim=0 --protect-hidden=no -p $password $verafile $veramtpt");
+                	system("veracrypt -k \"\" --fs-options=uid=robert,gid=robert,umask=007 --pim=0 --protect-hidden=no -p $password $verafile $veramtpt");		
 			print "mounted $verafile at $veramtpt\n";
+			# mtab has been altered and must be read again
+			$mtab = `cat /etc/mtab`;
 		} else {			
 			print "$verafile is already mounted\n";
 		}
