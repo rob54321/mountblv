@@ -115,7 +115,6 @@ sub umount {
 		# unmount disk only if all vera containers for that disk are unmounted
 		foreach $arg (@ulist) {
 			# is $arg a vera mtpt or vera container or disk label of bitlocker mountpoint?
-			print "arg $arg\n";
 			if (grep /^$arg$/, @attachedveramtpts) {
 				# arg is a vera mount point, unmount
 				# un mount if not mounted
@@ -183,6 +182,9 @@ print"umount verafile: dlabel $dlabel: arg $arg: vmtpt $vmtpt\n";
 				# delete line with mountpoint in /tmp/bitlockermounted
 				$arg =~ s/\//\\\//g;
 				system("sed -i -e '/$arg/d' /tmp/bitlockermounted");
+			} else {
+				# arg is unknown or already unmounted
+				print "$arg is not mounted\n";
 			}
 		} # end foreach
 	} # end if else
