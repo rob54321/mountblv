@@ -4,6 +4,55 @@
 
 use Getopt::Std;
 
+# sub to umount vera container, update vmounts, mtab and check
+# if the disk can be unmounted. The correct line is removed from /tmp/veralist
+# the call: umountveracontainer(vera_mtpt)
+sub umountveracontainer {
+	my $vmtpt = shift;
+
+	# un mount if not mounted
+	if ($mtab =~ /\s+$vmtpt\s+/) {
+		system("veracrypt -d $vmtpt");
+		rmdir "$vmtpt";
+		# get the label and vera file
+		my ($dlabel, $verafile) = getlabelvfilefromvmtpt($vmtpt);
+		print "umounted $verafile mounted at $vmtpt\n";
+		print "removed $vmtpt\n";
+		# delete line in /tmp/veralist with vera mtpt in it
+		$vmtpt =~ s/\//\\\//g;
+		# file lines label:dmtpt:vera_file:vera_mtpt
+		system("sed -i -e '/:$vmtpt\$/d' /tmp/veralist");
+		# delete this entry in hash %vmounts so it is up to date
+		delete $vmounts{$dlabel}->{$verafile};
+		# check if disk with vera container should be unmounted
+
+		###########################################
+		# testing
+		#foreach my $label (keys(%vmounts)) {
+		#	foreach my $vfile (keys(%{$vmounts{$label}})) {
+		#		print "$label => $vfile => $vmounts{$label}->{$vfile}\n";
+		#	}
+		#}
+		############################################
+		if (! keys(%{$vmounts{$dlabel}})) {
+			my $dmtpt = $vdevice{$dlabel}->[0];
+			if (grep /^$dmtpt$/, @vdiskmounts) {
+				system("umount $dmtpt");
+				print "umount $dmtpt\n";
+				# remove line from /tmp/veradrivelist
+				$dmtpt =~ s/\//\\\//g;
+				system("sed -i -e '/$dmtpt/d' /tmp/veradrivelist");
+				# is it necessary to remove $dmtpt from @vdiskmounts
+				# i don't think so
+			}
+		# update $mtab
+		$mtab = `cat /etc/mtab`;
+		}
+	} else {
+		print "$vmtpt is not mounted\n";
+	}
+
+}
 # sub to make lists of mounted devices.
 # values are read from the files /tmp/veradrivelist, /tmp/veradirlist, /tmp/bitlockermounted
 sub listmounteddev {
@@ -75,6 +124,7 @@ sub umount {
 		# remove all vera mtpts
 		foreach my $dlabel (keys(%vmounts)) {
 			foreach my $verafile (keys(%{$vmounts{$dlabel}})) {
+				print "umounted $verafile mounted at $vmounts{$dlabel}->{$verafile}\n";
 				rmdir "$vmounts{$dlabel}->{$verafile}";
 				print "removed $vmounts{$dlabel}->{$verafile}\n";
 			}
@@ -116,79 +166,23 @@ sub umount {
 		foreach $arg (@ulist) {
 			# is $arg a vera mtpt or vera container or disk label of bitlocker mountpoint?
 			if (grep /^$arg$/, @attachedveramtpts) {
-				# arg is a vera mount point, unmount
-				# un mount if not mounted
-				if ($mtab =~ /\s+$arg\s+/) {
-					system("veracrypt -d $arg");
-					rmdir "$arg";
-					# get the label and vera file
-					my ($dlabel, $verafile) = getlabelvfilefromvmtpt($arg);
-					print "umounted $verafile mounted at $arg\n";
-					print "removed $arg\n";
-					# delete line in /tmp/veralist with vera mtpt in it
-					$arg =~ s/\//\\\//g;
-					system("sed -i -e '/$arg/d' /tmp/veralist");
-					# delete this entry in hash %vmounts so it is up to date
-					delete $vmounts{$dlabel}->{$verafile};
-					# update $mtab
-					$mtab = `cat /etc/mtab`;
-					# check if disk with vera container should be unmounted
-				} else {
-					print "$arg is not mounted\n";
-				}
+				umountveracontainer($arg);
+
 			} elsif (grep /^$arg$/, @attachedverafiles) {
 				# arg is a verafile
 				# un mount if not mounted
 				my $dlabel = getlabelfromvfile($arg);
 				# must use vdevice instead of vmounts because verafile may have been umounted
 				my $vmtpt = $vdevice{$dlabel}->[1]->{$arg}->[0];
-				if ($mtab =~ /\s+$vmtpt\s+/) {
-					system("veracrypt -d $vmtpt");
-					rmdir "$vmtpt";
-					print "umounted $arg mounted at $vmtpt\n";
-					print "removed $vmtpt\n";
-					# delete line in veralist with $verafile in it
-					$arg =~ s/\//\\\//g;
-					system("sed -i -e '/$arg/d' /tmp/veralist");
-					# delete this entry in hash %vmounts so it is up to date
-					delete $vmounts{$dlabel}->{$arg};
-					# update $mtab
-					$mtab = `cat /etc/mtab`;
-					# check if disk with vera container should be unmounted
-				} else {
-					print "$arg is not mounted\n";
-				}
+				umountveracontainer($vmtpt);
+
 			} elsif (exists $vdevice{$arg}) {
 				# arg is a disk label. umount all vera containers associated with the label
-				# and umount the disk if mbl.pl mounted it
 				foreach my $verafile (keys(%{$vdevice{$arg}->[1]})) {
 					my $vmtpt = $vdevice{$arg}->[1]->{$verafile}->[0];
-					if ($mtab =~ /\s+$vmtpt\s+/) {
-						system("veracrypt -d $verafile");
-						rmdir "$vmounts{$arg}->{$verafile}";
-						print "umounted $verafile at $vmounts{$arg}->{$verafile}\n";
-						print "removed $vmounts{$arg}->{$verafile}\n";
-						# delete line in veralist file with $verafile in it
-						$verafile =~ s/\//\\\//g;
-						system("sed -i -e '/$verafile/d' /tmp/veralist");
-					} else {
-						print "$vmtpt is not mounted\n";
-					}
+					umountveracontainer($vmtpt);
 				} # end of foreach
-				# delete this dlabel from %vmounts since all vera files unmounted
-				delete %vmounts{$arg};
-				# update $mtab
-				$mtab = `cat /etc/mtab`;
-				# un mount disk if mounted by mbl.pl
-				my $dmtpt = $vdevice{$arg}->[0];
-				if (grep /^$dmtpt$/, @vdiskmounts) {
-					system("umount $dmtpt");
-					print "umounted $dmtpt\n";
-					# remove entry from /tmp/veradrivelist
-					$dmtpt =~ s/\//\\\//g;
-					system("sed -i -e '/$dmtpt/d' /tmp/veradrivelist");
 
-				}
 			} elsif (exists $blmounts{$arg}) {
 				# arg is the mount point of a mounted bitlocker drive
 				# unmount mountpoint then encrypted file
