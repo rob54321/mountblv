@@ -650,7 +650,7 @@ our %vdevice = (
 				  '/mnt/trans/v4/v3/vera'        => ['/mnt/veratrans5','coahtr3552']}],
 	 can    => ['/mnt/can',  {'/mnt/can/backups/lynn/vera'   => ['/mnt/veracan',   'coahtr3552']}]);
 
-our ($opt_h, $opt_v, $opt_u, $opt_V);
+our ($opt_h, $opt_v, $opt_u, $opt_V, $opt_a);
 
 # get no of command line arguments
 my $no = @ARGV;
@@ -661,10 +661,11 @@ defaultparameter();
 #print "after:  @ARGV\n";
 
 # get command line options
-getopts('b:v:u:hV');
+getopts('b:v:u:hVa');
 
 # usage for -h or no command line parameters
 if ($opt_h or $no == 0) {
+	print "mbl.pl -a to mount all bitlocker and vera containers\n";
 	print "mbl.pl -b to mount all bitlocker devices or list = [mountpoint ...]\n";
 	print "mbl.pl -v to mount all vera containers or list =[label|vera mountpoint|disk mountpoint|vera file|]\n";
 	print "mbl.pl -h to get this help\n";
@@ -692,6 +693,16 @@ if ($opt_V) {
 # get /etc/mtab to check for mounted devices
 our $mtab = `cat /etc/mtab`;
 
+# if -a given to mount everything
+if ($opt_a) {
+	attachedbldevices();
+	findbitlockerdevices("all");
+	makeattachedveralists();
+	mountvera ("all");
+	# all mounted, so exit
+	exit 0;
+}
+	
 # find and mount bitlocker devices and mount them
 if ($opt_b) {
 	# find attached known bit locker devices
