@@ -614,6 +614,9 @@ sub findbitlockerdevices {
 ############################
 # main entry point
 ############################
+# the version
+my $version = "1.11";
+
 # the hash contains password and mount point for bitlocker drives.
 # the key is the partuuid
 # hash format  for each record: partuuid => [password mountpoint]
@@ -647,7 +650,8 @@ our %vdevice = (
 				  '/mnt/trans/v4/v3/vera'        => ['/mnt/veratrans5','coahtr3552']}],
 	 can    => ['/mnt/can',  {'/mnt/can/backups/lynn/vera'   => ['/mnt/veracan',   'coahtr3552']}]);
 
-our ($opt_h, $opt_v, $opt_u);
+our ($opt_h, $opt_v, $opt_u, $opt_V);
+
 # get no of command line arguments
 my $no = @ARGV;
 
@@ -657,16 +661,22 @@ defaultparameter();
 #print "after:  @ARGV\n";
 
 # get command line options
-getopts('b:v:u:h');
+getopts('b:v:u:hV');
 
 # usage for -h or no command line parameters
 if ($opt_h or $no == 0) {
 	print "mbl.pl -b to mount all bitlocker devices or list = [mountpoint ...]\n";
 	print "mbl.pl -v to mount all vera containers or list =[label|vera mountpoint|disk mountpoint|vera file|]\n";
 	print "mbl.pl -h to get this help\n";
+	print "mbl.pl -V to get the version number\n";
 	exit 0;
 }
 
+# to get the version no
+if ($opt_V) {
+	print "Version $version\n";
+	exit 0;
+}
 
 # testing #
 #print "for bitlocker\n";
