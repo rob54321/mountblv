@@ -615,7 +615,7 @@ sub findbitlockerdevices {
 # main entry point
 ############################
 # the version
-my $version = "1.11";
+my $version = "1.13";
 
 # the hash contains password and mount point for bitlocker drives.
 # the key is the partuuid
@@ -668,6 +668,7 @@ if ($opt_h or $no == 0) {
 	print "mbl.pl -a to mount all bitlocker and vera containers\n";
 	print "mbl.pl -b to mount all bitlocker devices or list = [mountpoint ...]\n";
 	print "mbl.pl -v to mount all vera containers or list =[label|vera mountpoint|disk mountpoint|vera file|]\n";
+	print "mbl.pl -u to umount everthing that was mounted or [veralabel|veramtpt|verfile|bitlocker_mtpt]\n";
 	print "mbl.pl -h to get this help\n";
 	print "mbl.pl -V to get the version number\n";
 	exit 0;
