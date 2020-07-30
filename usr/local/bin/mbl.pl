@@ -54,12 +54,12 @@ sub umountveracontainer {
 
 }
 # sub to make lists of mounted devices.
-# values are read from the files /tmp/veradrivelist, /tmp/veradirlist, /tmp/bitlockermounted
+# values are read from the files /tmp/veradrivelist, /tmp/veralist, /tmp/bitlockermounted
 sub listmounteddev {
 	# each (key,value) of %vmounts is dlabel => {vfile => vmtpt}
-	our %vmounts = ();
-	our @vdiskmounts = ();
-	our %blmounts = ();
+	our %vmounts = ();     # %vmounts = (dlabel => {vfile => vmtpt})
+	our @vdiskmounts = (); # @vdiskmounts = (dmtpt1, dmtpt2,..)
+	our %blmounts = ();    # %blmounts = (dmtpt => [dlabel, encmountpt, created])
 
 	# make a hash of vera mounts: dlabel => {vfile => vmtpt} for each pair
 	if (open (VERALIST, "/tmp/veralist")) {
@@ -86,9 +86,9 @@ sub listmounteddev {
 	if ( open (BLOCKMOUNTED, "/tmp/bitlockermounted")) {
 		while (my $line = <BLOCKMOUNTED>) {
 			chomp($line);
-			my ($mdir, $encmount, $created) = split(/:/, $line);
+			my ($dlabel, $mdir, $encmount, $created) = split(/:/, $line);
 			# add elements to hash mdir => [encrypted file, creatation status]
-			$blmounts{$mdir} = [$encmount, $created];
+			$blmounts{$mdir} = [$dlabel, $encmount, $created];
 		}
 		# close
 		close (BLOCKMOUNTED);
@@ -107,6 +107,32 @@ sub listmounteddev {
 	#	print "mdir $mdir: encfile $blmounts{$mdir}->[0]: created $blmounts{$mdir}->[1]\n";
 	#}
 	######################################################
+}
+# sub to umount a bitlocker drive.
+# The mount point is unmounted and removed if it was created
+# the encrypted file is then unmounted and the directory removed
+# The line from /tmp/bitlockermounted file is deleted
+# the call mountbl(dmtpt, encfilemtpt)
+sub umountbl {
+	$dmtpt = shift;
+	$encfilemtpt = shift;
+
+	# unmount mountpoint then encrypted file
+	system("umount $dmtpt");
+	print "umounted $dmtpt\n";
+	if ($blmounts{$dmtpt}->[2] eq "created") {
+		# mbl.pl create directory, remove it
+		rmdir "$dmtpt";
+		print "removed $dmtpt\n";
+	}
+	# unmount encrypted file and remove directory
+	system("umount $encfilemtpt");
+	rmdir "$encfilemtpt";
+	print "removed $encfilemtpt\n";
+	# delete line with mountpoint in /tmp/bitlockermounted
+	$dmtpt =~ s/\//\\\//g;
+	system("sed -i -e '/:$dmtpt:/d' /tmp/bitlockermounted");
+
 }
 	
 # sub umount($opt_u) parses the input argument
@@ -145,16 +171,7 @@ sub umount {
 		# un mount all bit locker drives
 		# first the mountpoint, then the encrypted file
 		foreach my $dmtpt (keys(%blmounts)) {
-			system("umount $dmtpt");
-			print "umounted $dmtpt\n";
-			if ($blmounts{$dmtpt}->[1] eq "created") {
-				rmdir ("$dmtpt");
-				print "removed $dmtpt\n";
-			}
-			system("umount $blmounts{$dmtpt}->[0]");
-			print "umounted $blmounts{$dmtpt}->[0]\n";
-			rmdir ("$blmounts{$dmtpt}->[0]");
-			print "removed $blmounts{$dmtpt}->[0]\n";
+			umountbl($dmtpt, $blmounts{$dmtpt}->[1]);
 		}
 		unlink "/tmp/bitlockermounted";
 		print "\n";
@@ -185,24 +202,20 @@ sub umount {
 
 			} elsif (exists $blmounts{$arg}) {
 				# arg is the mount point of a mounted bitlocker drive
-				# unmount mountpoint then encrypted file
-				system("umount $arg");
-				print "umounted $arg\n";
-				if ($blmounts{$arg}->[1] eq "created") {
-					# mbl.pl create directory, remove it
-					rmdir "$arg";
-					print "removed $arg\n";
-				}
-				# unmount encrypted file and remove directory
-				system("umount $blmounts{$arg}->[0]");
-				rmdir "$blmounts{$arg}->[0]";
-				print "removed $blmounts{$arg}->[0]\n";
-				# delete line with mountpoint in /tmp/bitlockermounted
-				$arg =~ s/\//\\\//g;
-				system("sed -i -e '/$arg/d' /tmp/bitlockermounted");
+				umountbl($arg, $blmounts{$arg}->[1]);
 			} else {
-				# arg is unknown or already unmounted
-				print "$arg is not mounted\n";
+				# arg may be a bitlocker drive label
+				# %blmounts = (dmtpt => [dlabel, encmountpt, created
+				# check if dlabel is in blmounts
+				my $notdlabel = "true";
+				foreach my $dmtpt (keys(%blmounts)) {
+					if ($arg eq $blmounts{$dmtpt}->[0]) {
+						# arg is a dlabel, umount it
+						umountbl($dmtpt, $blmounts{$dmtpt}->[1]);
+						$notdlabel = "false";
+					}
+				}
+				print "$arg is not mounted\n" if $notdlabel eq "true";
 			}
 		} # end foreach
 	} # end if else
@@ -498,14 +511,15 @@ sub mountvera {
 # then file /mnt/bde[index]/bde1 is mounted at /mnt/mountpoint using a loop device
 # the mountpoint and bde_index are appended to the file  /tmp/bitlockermounted
 # so they can be unmounted at a later stage
-# the call: mountbl(device password mountpoint index)
+# the call: mountbl(device dlabel password mountpoint index)
 
 sub mountbl {
 	# parameters passed $device, $index in list
-	my(@command, $device, $password, $mountpoint, $index);
+	my(@command, $device, $dlabel, $password, $mountpoint, $index);
 	$index = pop @_;
 	$mountpoint = pop @_;
 	$password = pop @_;
+	$dlabel = pop @_;
 	$device = pop @_;
 
 
@@ -525,12 +539,12 @@ sub mountbl {
 			mkdir ($mountpoint);
 			# append a list of mounted directories, so they can be un mounted later.
 			# mark the directory as created
-			print LISTMOUNTED "$mountpoint:/mnt/bde$index:created\n";
+			print LISTMOUNTED "$dlabel:$mountpoint:/mnt/bde$index:created\n";
 		}
 		else {
  			# append a list of mounted directories for unmounting later
 			# mountpoint directory was not created	
-			print LISTMOUNTED "$mountpoint:/mnt/bde$index:exists\n";
+			print LISTMOUNTED "$dlabel:$mountpoint:/mnt/bde$index:exists\n";
 		}
 		# mount the decrypted file
 		print "mounted /mnt/bde$index/bde1 on $mountpoint\n";
@@ -574,6 +588,7 @@ sub findbitlockerdevices {
 	foreach my $blmtpt (keys(%attachedblmtpts)) {
 		my $password = $attachedblmtpts{$blmtpt}->[1];
 		my $device = $attachedblmtpts{$blmtpt}->[0];
+		my $dlabel = $attachedblmtpts{$blmtpt}->[2];
 
 		if (($blmtpts[0] eq "all") or (grep /^$blmtpt$/, @blmtpts)) {
 
@@ -585,7 +600,7 @@ sub findbitlockerdevices {
 				# mount all drives if passwords are defined
 				# only if it is not mounted
 				if ($mtab !~ /\s+$blmtpt\s+/) {
-					mountbl ($device, $password, $blmtpt, $index);
+					mountbl ($device, $dlabel, $password, $blmtpt, $index);
 				} else {
 					# drive is already mounted
 					print "$blmtpt is already mounted\n";
@@ -605,7 +620,7 @@ sub findbitlockerdevices {
 # main entry point
 ############################
 # the version
-my $version = "1.2";
+my $version = "1.3";
 
 # the hash contains password and mount point for bitlocker drives.
 # the key is the partuuid
