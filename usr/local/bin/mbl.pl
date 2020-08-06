@@ -620,7 +620,7 @@ sub findbitlockerdevices {
 # main entry point
 ############################
 # the version
-my $version = "1.4";
+my $version = "1.3";
 
 # the hash contains password and mount point for bitlocker drives.
 # the key is the partuuid
@@ -653,7 +653,11 @@ our %vdevice = (
 				  '/mnt/trans/v3/vera' 		 => ['/mnt/veratrans3','coahtr3552'],
 				  '/mnt/trans/v4/v2/vera'        => ['/mnt/veratrans4','coahtr3552'],
 				  '/mnt/trans/v4/v3/vera'        => ['/mnt/veratrans5','coahtr3552']}],
-	 can    => ['/mnt/can',  {'/mnt/can/backups/lynn/vera'   => ['/mnt/veracan',   'coahtr3552']}]);
+	 can    => ['/mnt/can',  {'/mnt/can/backups/lynn/vera'   => ['/mnt/veracan',   'coahtr3552']}],
+	 rootfs => ['/',         {'/home/robert/vera'            => ['/mnt/verah',     'coahtr3552'],
+                                  '/home/robert/v2/vera'         => ['/mnt/verah1',    'coahtr3552'],
+                                  '/home/robert/v2/v3/vera'      => ['/mnt/verah2',    'coahtr3552'],
+                                  '/home/robert/v2/v3/v4/vera'   => ['/mnt/verah3',    'coahtr3552']}]);
 
 our ($opt_m, $opt_h, $opt_v, $opt_u, $opt_V, $opt_a);
 
