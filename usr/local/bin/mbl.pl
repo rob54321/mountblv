@@ -620,7 +620,7 @@ sub findbitlockerdevices {
 # main entry point
 ############################
 # the version
-my $version = "1.3";
+my $version = "1.32";
 
 # the hash contains password and mount point for bitlocker drives.
 # the key is the partuuid
