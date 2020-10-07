@@ -1,8 +1,76 @@
-#!/usr/bin/perl -w
+#!/usr/bin/perl
 # script to mount bitlocker drives at mountpoints and vera encrtypted containers
 # the drives can also be unmounted with the correct switches
-
+use strict;
+use warnings;
 use Getopt::Std;
+
+# the version
+my $version = "1.41";
+
+# get /etc/mtab to check for mounted devices
+my $mtab = `cat /etc/mtab`;
+
+# the hash contains password and mount point for bitlocker drives.
+# the key is the partuuid
+# hash format  for each record: partuuid => [password mountpoint]
+# if mount point is not given then /mnt/drive1, /mnt/drive2, etc will be used
+my %allbldev = ("7150343d-01" => [qw(coahtr3552  /mnt/axiz axiz)],
+	    "dd816708-01" => [qw(coahtr3552 "")],
+            "7f8f684f-78e2-4903-903a-c5d9ab8f36ee" => [qw(panda108 /mnt/drivec drivec)],
+	    "0007ae00-01" => [qw(coahtr3552 /mnt/ssd ssd)],
+            "766349ae-03" => [qw(coahtr3552 "" ddd)],
+	    "3157edd8-01" => [qw(coahtr3552 /mnt/chaos chaos)],
+	    "78787878-01" => [qw(coahtr3552 /mnt/ver4 ver4)]);
+
+# the hash vdevice contains 
+# partition label => drive mountpoint, verafile, verafile mountpoint, password
+my %vdevice = ( 
+	 ssd    => ['/mnt/ssd',  {'/mnt/ssd/vera'                => ['/mnt/verassd',   'coahtr3552']}],
+	 hd3    => ['/mnt/hd3',  {'/mnt/hd3/backups/lynn/vera'   => ['/mnt/verahd3',   'coahtr3552']}],
+	 hd2    => ['/mnt/hd2',  {'/mnt/hd2/backups/lynn/vera'   => ['/mnt/verahd2',   'coahtr3552']}],
+	 hdint  => ['/mnt/hdint',{'/mnt/hdint/backups/lynn/vera' => ['/mnt/verahdint', 'coahtr3552']}],
+	 ad64   => ['/mnt/ad64', {'/mnt/ad64/vera'               => ['/mnt/veraad64',  'coahtr3552'],
+						 '/mnt/ad64/backups/vera'       => ['/mnt/veraad641', 'coahtr3552'],
+			          	 '/mnt/ad64/v2/vera'            => ['/mnt/veraad642', 'coahtr3552'],
+			          	 '/mnt/ad64/v3/vera'            => ['/mnt/veraad643', 'coahtr3552'],
+			            	 '/mnt/ad64/v4/vera'            => ['/mnt/veraad644', 'coahtr3552'],
+			          	 '/mnt/ad64/v5/vera'            => ['/mnt/veraad645', 'coahtr3552'],
+			          	 '/mnt/ad64/v6/vera'            => ['/mnt/veraad646', 'coahtr3552']}],
+	 win    => ['/mnt/win',  {'/mnt/win/lynn/vera'           => ['/mnt/verawin',   'coahtr3552']}],
+	 tosh   => ['/mnt/tosh', {'/mnt/tosh/backups/lynn/vera'  => ['/mnt/veratosh',  'coahtr3552']}],
+	 trans  => ['/mnt/trans',{'/mnt/trans/vera'              => ['/mnt/veratrans', 'coahtr3552'],
+          				 '/mnt/trans/backups/vera'      => ['/mnt/veratrans1','coahtr3552'],
+			                '/mnt/trans/v2/vera'           => ['/mnt/veratrans2','coahtr3552'],
+				           '/mnt/trans/v3/vera'     	  => ['/mnt/veratrans3','coahtr3552'],
+				           '/mnt/trans/v4/v2/vera'        => ['/mnt/veratrans4','coahtr3552'],
+				           '/mnt/trans/v4/v3/vera'        => ['/mnt/veratrans5','coahtr3552']}],
+	 can    => ['/mnt/can',  {'/mnt/can/backups/lynn/vera'   => ['/mnt/veracan',   'coahtr3552']}],
+	 rootfs => ['/',         {'/home/robert/vera'            => ['/mnt/verah',     'coahtr3552'],
+                               '/home/robert/v2/vera'         => ['/mnt/verah1',    'coahtr3552'],
+                               '/home/robert/v3/vera'         => ['/mnt/verah2',    'coahtr3552'],
+                               '/home/robert/v4/vera'         => ['/mnt/verah3',    'coahtr3552'],
+                               '/home/robert/v2/v3/vera'      => ['/mnt/verah4',    'coahtr3552'],
+                               '/home/robert/v2/v3/v4/vera'   => ['/mnt/verah5',    'coahtr3552']}]);
+
+our ($opt_m, $opt_h, $opt_v, $opt_u, $opt_V, $opt_a);
+
+# each (key,value) of %vmounts is dlabel => {vfile => vmtpt}
+my %vmounts = ();     # %vmounts = (dlabel => {vfile => vmtpt})
+my @vdiskmounts = (); # @vdiskmounts = (dmtpt1, dmtpt2,..)
+my %blmounts = ();    # %blmounts = (dmtpt => [dlabel, encmountpt, created])
+# declare global empty lists for the values
+my @attachedveralabels = ();
+my @attachedverafiles = ();
+my @attachedveramtpts = ();
+# attachedblmtpts contains a hash of partuuids => device of attached but not mounted bit locker drives
+# the partuuid must exist in allbldev hash
+# attachedveralabels contains a list of attached disk labels with vera containers on them
+my %attachedblmtpts = ();
+
+
+# get no of command line arguments
+my $no = @ARGV;
 
 # sub to umount vera container, update vmounts, mtab and check
 # if the disk can be unmounted. The correct line is removed from /tmp/veralist
@@ -56,11 +124,6 @@ sub umountveracontainer {
 # sub to make lists of mounted devices.
 # values are read from the files /tmp/veradrivelist, /tmp/veralist, /tmp/bitlockermounted
 sub listmounteddev {
-	# each (key,value) of %vmounts is dlabel => {vfile => vmtpt}
-	our %vmounts = ();     # %vmounts = (dlabel => {vfile => vmtpt})
-	our @vdiskmounts = (); # @vdiskmounts = (dmtpt1, dmtpt2,..)
-	our %blmounts = ();    # %blmounts = (dmtpt => [dlabel, encmountpt, created])
-
 	# make a hash of vera mounts: dlabel => {vfile => vmtpt} for each pair
 	if (open (VERALIST, "/tmp/veralist")) {
 		while (my $line = <VERALIST>) {
@@ -114,8 +177,8 @@ sub listmounteddev {
 # The line from /tmp/bitlockermounted file is deleted
 # the call mountbl(dmtpt, encfilemtpt)
 sub umountbl {
-	$dmtpt = shift;
-	$encfilemtpt = shift;
+	my $dmtpt = shift;
+	my $encfilemtpt = shift;
 
 	# unmount mountpoint then encrypted file
 	system("umount $dmtpt");
@@ -180,7 +243,7 @@ sub umount {
 		# umount each element in the list
 		# if the element is a label, umount all vera files
 		# unmount disk only if all vera containers for that disk are unmounted
-		foreach $arg (@ulist) {
+		foreach my $arg (@ulist) {
 			# is $arg a vera mtpt or vera container or disk label of bitlocker mountpoint?
 			if (grep /^$arg$/, @attachedveramtpts) {
 				umountveracontainer($arg);
@@ -278,17 +341,13 @@ sub getNextbde {
 # this sub makes a hash partuuid => device path of all known bitlocker drives
 # the call: attacheddevices();
 sub attachedbldevices {
-	# attachedblmtpts contains a hash of partuuids => device of attached but not mounted bit locker drives
-	# the partuuid must exist in allbldev hash
-	# attachedveralabels contains a list of attached disk labels with vera containers on them
-	our %attachedblmtpts = ();
 
 	# for bitlocker devices only
 	my @devlist = `lsblk -o PATH,PARTUUID,FSTYPE`;
 
 	# for each element (line) in the list split it into a key value pair
 	# if the key is blank do not add it to the hash
-	foreach $ele (@devlist) {
+	foreach my $ele (@devlist) {
 		chomp($ele);
 	    	my ($device, $partuuid, $fstype) = split /\s+/, $ele;
 		# only add to the hash for fstype = BitLocker
@@ -416,11 +475,6 @@ sub mountveracontainer {
 # the individual vera files can be then be mounted.
 # no parameters are passed and none are returned.
 sub makeattachedveralists {
-	# declare global empty lists for the values
-	our @attachedveralabels = ();
-	our @attachedverafiles = ();
-	our @attachedveramtpts = ();
-
 	# make a list of attached devices labels if they contain vera containers
 	my @vlist = `lsblk -o LABEL`;
 	foreach my $label (@vlist) {
@@ -474,7 +528,7 @@ sub mountvera {
 	} else {
 		# there is a list of arguments following -v
 		# verafile | vera_mountpoint | disk_label
-		foreach $arg (@veralist) {
+		foreach my $arg (@veralist) {
 			# is the argument a disk label?
 			if (grep (/^$arg$/, @attachedveralabels)) {
 				# argument is a disk label
@@ -619,55 +673,6 @@ sub findbitlockerdevices {
 ############################
 # main entry point
 ############################
-# the version
-my $version = "1.41";
-
-# the hash contains password and mount point for bitlocker drives.
-# the key is the partuuid
-# hash format  for each record: partuuid => [password mountpoint]
-# if mount point is not given then /mnt/drive1, /mnt/drive2, etc will be used
-our %allbldev = ("7150343d-01" => [qw(coahtr3552  /mnt/axiz axiz)],
-	    "dd816708-01" => [qw(coahtr3552 "")],
-            "7f8f684f-78e2-4903-903a-c5d9ab8f36ee" => [qw(panda108 /mnt/drivec drivec)],
-	    "0007ae00-01" => [qw(coahtr3552 /mnt/ssd ssd)],
-            "766349ae-03" => [qw(coahtr3552 "" ddd)],
-	    "3157edd8-01" => [qw(coahtr3552 /mnt/chaos chaos)],
-	    "78787878-01" => [qw(coahtr3552 /mnt/ver4 ver4)]);
-
-# the hash vdevice contains 
-# partition label => drive mountpoint, verafile, verafile mountpoint, password
-our %vdevice = ( 
-	 ssd    => ['/mnt/ssd',  {'/mnt/ssd/vera'                => ['/mnt/verassd',   'coahtr3552']}],
-	 hd3    => ['/mnt/hd3',  {'/mnt/hd3/backups/lynn/vera'   => ['/mnt/verahd3',   'coahtr3552']}],
-	 hd2    => ['/mnt/hd2',  {'/mnt/hd2/backups/lynn/vera'   => ['/mnt/verahd2',   'coahtr3552']}],
-	 hdint  => ['/mnt/hdint',{'/mnt/hdint/backups/lynn/vera' => ['/mnt/verahdint', 'coahtr3552']}],
-	 ad64   => ['/mnt/ad64', {'/mnt/ad64/vera'               => ['/mnt/veraad64',  'coahtr3552'],
-						 '/mnt/ad64/backups/vera'       => ['/mnt/veraad641', 'coahtr3552'],
-			          	 '/mnt/ad64/v2/vera'            => ['/mnt/veraad642', 'coahtr3552'],
-			          	 '/mnt/ad64/v3/vera'            => ['/mnt/veraad643', 'coahtr3552'],
-			            	 '/mnt/ad64/v4/vera'            => ['/mnt/veraad644', 'coahtr3552'],
-			          	 '/mnt/ad64/v5/vera'            => ['/mnt/veraad645', 'coahtr3552'],
-			          	 '/mnt/ad64/v6/vera'            => ['/mnt/veraad646', 'coahtr3552']}],
-	 win    => ['/mnt/win',  {'/mnt/win/lynn/vera'           => ['/mnt/verawin',   'coahtr3552']}],
-	 tosh   => ['/mnt/tosh', {'/mnt/tosh/backups/lynn/vera'  => ['/mnt/veratosh',  'coahtr3552']}],
-	 trans  => ['/mnt/trans',{'/mnt/trans/vera'              => ['/mnt/veratrans', 'coahtr3552'],
-          				 '/mnt/trans/backups/vera'      => ['/mnt/veratrans1','coahtr3552'],
-			                '/mnt/trans/v2/vera'           => ['/mnt/veratrans2','coahtr3552'],
-				           '/mnt/trans/v3/vera'     	  => ['/mnt/veratrans3','coahtr3552'],
-				           '/mnt/trans/v4/v2/vera'        => ['/mnt/veratrans4','coahtr3552'],
-				           '/mnt/trans/v4/v3/vera'        => ['/mnt/veratrans5','coahtr3552']}],
-	 can    => ['/mnt/can',  {'/mnt/can/backups/lynn/vera'   => ['/mnt/veracan',   'coahtr3552']}],
-	 rootfs => ['/',         {'/home/robert/vera'            => ['/mnt/verah',     'coahtr3552'],
-                               '/home/robert/v2/vera'         => ['/mnt/verah1',    'coahtr3552'],
-                               '/home/robert/v3/vera'         => ['/mnt/verah2',    'coahtr3552'],
-                               '/home/robert/v4/vera'         => ['/mnt/verah3',    'coahtr3552'],
-                               '/home/robert/v2/v3/vera'      => ['/mnt/verah4',    'coahtr3552'],
-                               '/home/robert/v2/v3/v4/vera'   => ['/mnt/verah5',    'coahtr3552']}]);
-
-our ($opt_m, $opt_h, $opt_v, $opt_u, $opt_V, $opt_a);
-
-# get no of command line arguments
-my $no = @ARGV;
 
 # check to see if default arguments must be supplied to -b -v -u
 #print "before: @ARGV\n";
@@ -691,9 +696,6 @@ if ($opt_V) {
 	print "Version $version\n";
 	exit 0;
 }
-
-# get /etc/mtab to check for mounted devices
-our $mtab = `cat /etc/mtab`;
 
 # if -m given to mount everything or any combo of bitlocker drives or vera containers
 if ($opt_m) {
@@ -723,7 +725,7 @@ if ($opt_m) {
 		# make a list of all possible vera arguments
 		my @vlist = ();
 		my @veraargs = (@attachedveralabels, @attachedverafiles, @attachedveramtpts);
-		foreach $arg (@cllist) {
+		foreach my $arg (@cllist) {
 			push @vlist,  $arg if grep /^$arg$/, @veraargs;
 		}
 		# only call the subs if there are devices to mount
