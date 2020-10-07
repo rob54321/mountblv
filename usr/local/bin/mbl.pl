@@ -761,7 +761,6 @@ if ($opt_l) {
 		# %vdevice: partition label => [drive mountpoint, {verafile => [verafile_mountpoint, password]}]
 
 		my $dmtpt = $vdevice{$dlabel}->[0];
-		print "$dlabel: $dmtpt: @vdiskmounts\n";
 		if (grep /^$dmtpt$/, @vdiskmounts) {
 			# disk containing vera containers was mounted by mbl
 			print "$dlabel: mounted by mbl.pl:\n";
@@ -769,9 +768,21 @@ if ($opt_l) {
 			# disk was already mounted
 			print "$dlabel: previously mounted\n";
 		}
-		
+		printf "%-35s\t\t %s\n", "veracrypt file", "mount point";		
 		foreach my $vfile (keys(%{$vmounts{$dlabel}})) {
-			print "$vfile \t\t\t$vmounts{$dlabel}->{$vfile}\n";
+			printf "%-35s\t\t %s\n", $vfile, $vmounts{$dlabel}->{$vfile};
+			
+		}
+		print "\n";
+	}
+	# display all bitlocker drives
+	my $no_keys = keys(%blmounts);
+	if ($no_keys == 0) {
+		print "no bitlocker drives mounted\n";
+	} else {
+		printf "%-35s\t\t %-20s %s\n", "disk label", "enc mount point", "disk mount point";
+		foreach my $dmtpt (keys(%blmounts)) {
+			printf "%-35s\t\t %-20s %s\n", $blmounts{$dmtpt}->[0], $blmounts{$dmtpt}->[1], $dmtpt;
 		}
 	}
 }
