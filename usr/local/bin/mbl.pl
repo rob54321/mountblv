@@ -24,7 +24,7 @@ my %allbldev = ("7150343d-01" => [qw(coahtr3552  /mnt/axiz axiz)],
 	    "78787878-01" => [qw(coahtr3552 /mnt/ver4 ver4)]);
 
 # the hash vdevice contains 
-# partition label => drive mountpoint, verafile, verafile mountpoint, password
+# partition label => [drive mountpoint, {verafile => [verafile_mountpoint, password]}]
 my %vdevice = ( 
 	 ssd    => ['/mnt/ssd',  {'/mnt/ssd/vera'                => ['/mnt/verassd',   'coahtr3552']}],
 	 hd3    => ['/mnt/hd3',  {'/mnt/hd3/backups/lynn/vera'   => ['/mnt/verahd3',   'coahtr3552']}],
@@ -53,7 +53,7 @@ my %vdevice = (
                                '/home/robert/v2/v3/vera'      => ['/mnt/verah4',    'coahtr3552'],
                                '/home/robert/v2/v3/v4/vera'   => ['/mnt/verah5',    'coahtr3552']}]);
 
-our ($opt_m, $opt_h, $opt_v, $opt_u, $opt_V, $opt_a);
+our ($opt_l, $opt_m, $opt_h, $opt_v, $opt_u, $opt_V, $opt_a);
 
 # each (key,value) of %vmounts is dlabel => {vfile => vmtpt}
 my %vmounts = ();     # %vmounts = (dlabel => {vfile => vmtpt})
@@ -680,12 +680,13 @@ defaultparameter();
 #print "after:  @ARGV\n";
 
 # get command line options
-getopts('m:u:hV');
+getopts('lm:u:hV');
 
 # usage for -h or no command line parameters
 if ($opt_h or $no == 0) {
 	print "mbl.pl -m to mount all or list to mount [veralabel|vmtpt|verafile|blmtpt|bllabel]\n";
 	print "mbl.pl -u to umount everthing that was mounted or [veralabel|veramtpt|verfile|bitlocker_mtpt]\n";
+	print "mbl.pl -l list all mounted bitlocker drives and veracrypt containers";
 	print "mbl.pl -h to get this help\n";
 	print "mbl.pl -V to get the version number\n";
 	exit 0;
@@ -744,4 +745,33 @@ if ($opt_u) {
 	# any one of: veramtpt, vera container, disk label, bit locker mountpoint
 	makeattachedveralists();
 	umount($opt_u);
+}
+# to list all bitlocker drives and veracrypt containers
+if ($opt_l) {
+	# read mounted devices from files
+	listmounteddev();
+
+	# %vmounts = (dlabel => {vfile => veramtpt})
+	# %blmounts = (dmtpt => [dlabel, encmountpt, created])
+	# @vdiskmounts = [dmtpt1, dmtpt2, dmtpt3....]
+	# display veracontainter mounted devices
+	foreach my $dlabel (keys(%vmounts)) {
+		# print disk was mounted if mbl mounted the disk
+		# vdiskmounts has mountpoint of drive mounted by mbl
+		# %vdevice: partition label => [drive mountpoint, {verafile => [verafile_mountpoint, password]}]
+
+		my $dmtpt = $vdevice{$dlabel}->[0];
+		print "$dlabel: $dmtpt: @vdiskmounts\n";
+		if (grep /^$dmtpt$/, @vdiskmounts) {
+			# disk containing vera containers was mounted by mbl
+			print "$dlabel: mounted by mbl.pl:\n";
+		} else {
+			# disk was already mounted
+			print "$dlabel: previously mounted\n";
+		}
+		
+		foreach my $vfile (keys(%{$vmounts{$dlabel}})) {
+			print "$vfile \t\t\t$vmounts{$dlabel}->{$vfile}\n";
+		}
+	}
 }
