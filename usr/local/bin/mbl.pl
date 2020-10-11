@@ -436,7 +436,6 @@ sub mountveracontainer {
 	# get vera mountpoint
 	my $veramtpt = $vdevice{$dlabel}->[1]->{$verafile}->[0];
 #	my $password = $vdevice{$dlabel}->[1]->{$verafile}->[1];
-	my $password = $passman->getpwd($verafile);
 	my $dmtpt = $vdevice{$dlabel}->[0];
 
 	# mount disk if necessary
@@ -457,6 +456,7 @@ sub mountveracontainer {
 		if ( $mtab !~ /\s+$veramtpt\s+/) {
 			# mount vera file
 			# add vera mountpoint for removal later
+			my $password = $passman->getpwd($verafile);
 			print VERALIST "$dlabel:$vdevice{$dlabel}->[0]:$verafile:$veramtpt\n";
 
 			# mkdir mountpoint if it does not exist
@@ -650,27 +650,24 @@ sub findbitlockerdevices {
 		my $device = $attachedblmtpts{$blmtpt}->[0];
 		my $dlabel = $attachedblmtpts{$blmtpt}->[2];
 #		my $password = $attachedblmtpts{$blmtpt}->[1];
-		my $password = $passman->getpwd($dlabel);
 
 		if (($blmtpts[0] eq "all") or (grep /^$blmtpt$/, @blmtpts)) {
 
-			# mount drive if there is a password and the argument for -b is all
-			if($password) {
-				# get next available /mnt/bde$index directory
-				$index = getNextbde(++$index);
+			# mount drive
+			# get next available /mnt/bde$index directory
+			$index = getNextbde(++$index);
 
-				# mount all drives if passwords are defined
-				# only if it is not mounted
-				if ($mtab !~ /\s+$blmtpt\s+/) {
-					mountbl ($device, $dlabel, $password, $blmtpt, $index);
-				} else {
-					# drive is already mounted
-					print "$blmtpt is already mounted\n";
-				}
+			# mount all drives if passwords are defined
+			# only if it is not mounted
+			if ($mtab !~ /\s+$blmtpt\s+/) {
+				# get password of bitlocker drive to be mounted
+				my $password = $passman->getpwd($dlabel);
+				mountbl ($device, $dlabel, $password, $blmtpt, $index);
 			} else {
-				print "Could not mount $device, unknown password\n";
-			}
-		}
+				# drive is already mounted
+				print "$blmtpt is already mounted\n";
+			} # end if mtab
+		} # end if blmtpts
 	}
 	close(LISTMOUNTED);
 	# for spacing
@@ -776,10 +773,11 @@ if ($opt_m) {
 		my @cllist = split /\s+/, $opt_m;
 
 
-		# make a list of known bit locker disk mountpoints or labels that are in cllist
+		# make a list of known bit locker disks in cllist
 		my @blmtpts = ();
 		foreach my $blmtpt (keys(%attachedblmtpts)) {
 			my $dlabel = $attachedblmtpts{$blmtpt}->[2];
+			# push bl mountpoint onto blmtpts if blmtpt is a mountpoint or disk label
 			push @blmtpts, $blmtpt if grep /^$blmtpt$/, @cllist;
 			push @blmtpts, $blmtpt if grep /^$dlabel$/, @cllist;
 		} # end of foreach blmtpt
