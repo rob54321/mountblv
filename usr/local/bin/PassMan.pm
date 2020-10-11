@@ -63,14 +63,13 @@ sub new {
 	return bless {}, $class;
 }
 
-# method to get the pwd if it exits in mbl.rc
-# if it does not exist, it must be created.
-# mbl.rc:  verafile:encrypted_password
-# getpwd(verafile)
-sub getpwd {
+# method to find file in mbl.rc
+# returns undef if not found
+# returns the decrypted password if found
+# searchrc(file)
+sub searchrc {
 	my $self = shift;
 	my $vfile = shift;
-	
 	# open resource file for reading
 	if (open RCFILE, "<", $rcfile) {
 		
@@ -86,14 +85,30 @@ sub getpwd {
 				return $pwd;
 			}
 		} # end while
-	close RCFILE;
-	} # end if open
+		close RCFILE;
+	
+	} # end if
+	# vera file not found return undef
+	return undef;
+}
 
-	# vera file not found
+# method to get the pwd if it exits in mbl.rc
+# if it does not exist, it must be created.
+# mbl.rc:  filename:encrypted_password
+# getpwd(verafile)
+sub getpwd {
+	my $self = shift;
+	my $vfile = shift;
+		
+	# search for password
+	my $pwd = $self->searchrc($vfile);
+	return $pwd if $pwd;
+	
+	# filename not found
 	#prompt for the password
 	print "password not found for $vfile\n";
 	print "Enter password for $vfile\n";
-	my $pwd = <STDIN>;
+	$pwd = <STDIN>;
 	chomp($pwd);
 
 	# encrypt the password
@@ -106,13 +121,21 @@ sub getpwd {
 }
 
 # delete a password in the resource file
-# delpwd(vera_file)
+# delpwd(filename)
+# returns true if successfull
+# returns undef if filename not found
 sub delpwd {
 	my $self = shift;
 	my $vfile = shift;
+
+	# search for verafile
+	my $pwd = $self->searchrc($vfile);
+	return undef unless $pwd;
+		
+	# replace / with \/ for sed
+	# delete password line in file
 	$vfile =~ s/\//\\\//g;
-	print "$vfile\n";
-	my $rc = system("sed -i -e '/$vfile/d' $rcfile");
-	print "$rc\n";
+	system("sed -i -e '/$vfile/d' $rcfile");
+	return 1;
 }
 1;

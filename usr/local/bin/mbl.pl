@@ -4,6 +4,11 @@
 use strict;
 use warnings;
 use Getopt::Std;
+use lib "./";
+use PassMan;
+
+# passManger
+my $passman;
 
 # the version
 my $version = "1.41";
@@ -13,7 +18,7 @@ my $mtab = `cat /etc/mtab`;
 
 # the hash contains password and mount point for bitlocker drives.
 # the key is the partuuid
-# hash format  for each record: partuuid => [password mountpoint]
+# hash format  for each record: partuuid => [password mountpoint disk_label]
 # if mount point is not given then /mnt/drive1, /mnt/drive2, etc will be used
 my %allbldev = ("7150343d-01" => [qw(coahtr3552  /mnt/axiz axiz)],
 	    "dd816708-01" => [qw(coahtr3552 "")],
@@ -60,12 +65,14 @@ my %vmounts = ();     # %vmounts = (dlabel => {vfile => vmtpt})
 my @vdiskmounts = (); # @vdiskmounts = (dmtpt1, dmtpt2,..)
 my %blmounts = ();    # %blmounts = (dmtpt => [dlabel, encmountpt, created])
 # declare global empty lists for the values
+# attachedveralabels contains a list of attached disk labels with vera containers on them
 my @attachedveralabels = ();
 my @attachedverafiles = ();
 my @attachedveramtpts = ();
-# attachedblmtpts contains a hash of partuuids => device of attached but not mounted bit locker drives
-# the partuuid must exist in allbldev hash
-# attachedveralabels contains a list of attached disk labels with vera containers on them
+
+
+# attachedblmtpts: blmtpts => [device, password, disk_label]
+# devices are attached, and known to allbldev
 my %attachedblmtpts = ();
 
 
@@ -366,7 +373,6 @@ sub attachedbldevices {
 			}
 		} 
 	}
-
 }
 
 # this sub operates on the list @ARGV
@@ -429,7 +435,8 @@ sub mountveracontainer {
 
 	# get vera mountpoint
 	my $veramtpt = $vdevice{$dlabel}->[1]->{$verafile}->[0];
-	my $password = $vdevice{$dlabel}->[1]->{$verafile}->[1];
+#	my $password = $vdevice{$dlabel}->[1]->{$verafile}->[1];
+	my $password = $passman->getpwd($verafile);
 	my $dmtpt = $vdevice{$dlabel}->[0];
 
 	# mount disk if necessary
@@ -640,9 +647,10 @@ sub findbitlockerdevices {
 
 	# for each bit locker mountpoint in cl args mount drive if it is  not mounted
 	foreach my $blmtpt (keys(%attachedblmtpts)) {
-		my $password = $attachedblmtpts{$blmtpt}->[1];
 		my $device = $attachedblmtpts{$blmtpt}->[0];
 		my $dlabel = $attachedblmtpts{$blmtpt}->[2];
+#		my $password = $attachedblmtpts{$blmtpt}->[1];
+		my $password = $passman->getpwd($dlabel);
 
 		if (($blmtpts[0] eq "all") or (grep /^$blmtpt$/, @blmtpts)) {
 
@@ -698,44 +706,6 @@ if ($opt_V) {
 	exit 0;
 }
 
-# if -m given to mount everything or any combo of bitlocker drives or vera containers
-if ($opt_m) {
-	attachedbldevices();
-	makeattachedveralists();
-	if ($opt_m eq "all") {
-		findbitlockerdevices("all");
-		mountvera ("all");
-	} else {
-		# a string of vera_mtpts|vera_files|vera_disk_labels|bitlocker_mtpts|bitlocker_label
-		# was given in the command line parameter
-		# make a list of bit locker arguments @bllist
-		# and make a list of vera mtpts/vera files/vera labels
-		# make a list of command line parameters
-		my @cllist = split /\s+/, $opt_m;
-
-
-		# make a list of known bit locker disk mountpoints or labels that are in cllist
-		my @blmtpts = ();
-		foreach my $blmtpt (keys(%attachedblmtpts)) {
-			my $dlabel = $attachedblmtpts{$blmtpt}->[2];
-			push @blmtpts, $blmtpt if grep /^$blmtpt$/, @cllist;
-			push @blmtpts, $blmtpt if grep /^$dlabel$/, @cllist;
-		} # end of foreach blmtpt
-			
-		# check the cllist for vera arguments add them to vlist
-		# make a list of all possible vera arguments
-		my @vlist = ();
-		my @veraargs = (@attachedveralabels, @attachedverafiles, @attachedveramtpts);
-		foreach my $arg (@cllist) {
-			push @vlist,  $arg if grep /^$arg$/, @veraargs;
-		}
-		# only call the subs if there are devices to mount
-		findbitlockerdevices(@blmtpts) if defined $blmtpts[0];
-		mountvera(@vlist) if defined $vlist[0];
-	}
-	# all mounted, so exit
-	exit 0;
-}
 
 # to unmount devices
 if ($opt_u) {
@@ -785,4 +755,46 @@ if ($opt_l) {
 			printf "%-35s\t\t %-20s %s\n", $blmounts{$dmtpt}->[0], $blmounts{$dmtpt}->[1], $dmtpt;
 		}
 	}
+}
+
+# if -m given to mount everything or any combo of bitlocker drives or vera containers
+if ($opt_m) {
+	# create PassManger
+	$passman = new PassMan();
+	
+	attachedbldevices();
+	makeattachedveralists();
+	if ($opt_m eq "all") {
+		findbitlockerdevices("all");
+		mountvera ("all");
+	} else {
+		# a string of vera_mtpts|vera_files|vera_disk_labels|bitlocker_mtpts|bitlocker_label
+		# was given in the command line parameter
+		# make a list of bit locker arguments @bllist
+		# and make a list of vera mtpts/vera files/vera labels
+		# make a list of command line parameters
+		my @cllist = split /\s+/, $opt_m;
+
+
+		# make a list of known bit locker disk mountpoints or labels that are in cllist
+		my @blmtpts = ();
+		foreach my $blmtpt (keys(%attachedblmtpts)) {
+			my $dlabel = $attachedblmtpts{$blmtpt}->[2];
+			push @blmtpts, $blmtpt if grep /^$blmtpt$/, @cllist;
+			push @blmtpts, $blmtpt if grep /^$dlabel$/, @cllist;
+		} # end of foreach blmtpt
+			
+		# check the cllist for vera arguments add them to vlist
+		# make a list of all possible vera arguments
+		my @vlist = ();
+		my @veraargs = (@attachedveralabels, @attachedverafiles, @attachedveramtpts);
+		foreach my $arg (@cllist) {
+			push @vlist,  $arg if grep /^$arg$/, @veraargs;
+		}
+		# only call the subs if there are devices to mount
+		findbitlockerdevices(@blmtpts) if defined $blmtpts[0];
+		mountvera(@vlist) if defined $vlist[0];
+	}
+	# all mounted, so exit
+	exit 0;
 }
