@@ -4,8 +4,6 @@
 use strict;
 use warnings;
 use Getopt::Std;
-use Crypt::Blowfish;
-use Crypt::CBC;
 
 # the version
 my $version = "1.41";
