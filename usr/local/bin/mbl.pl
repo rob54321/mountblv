@@ -773,7 +773,7 @@ if ($opt_m) {
 		my @cllist = split /\s+/, $opt_m;
 
 
-		# make a list of known bit locker disks in cllist
+		# make a list of known bit locker disk mount points in cllist that are attached
 		my @blmtpts = ();
 		foreach my $blmtpt (keys(%attachedblmtpts)) {
 			my $dlabel = $attachedblmtpts{$blmtpt}->[2];

@@ -11,13 +11,9 @@ use warnings;
 use Crypt::Blowfish;
 use Crypt::CBC;
 use Crypt::Digest;
-use IO::Handle;
 
 # cipher
 my $cipher;
-
-# file handle for appending to mbl.rc
-my $fh;
 
 # resource file
 my $rcfile = "mbl.rc";
@@ -54,12 +50,6 @@ sub new {
 	$cipher = new Crypt::CBC(-key    => $key,
 						-cipher => 'Blowfish');
 						
-	# open in current directory for appending
-	# create it if it does not exist
-	$fh = new IO::Handle();
-	$fh->autoflush();
-	open $fh, ">>", $rcfile;
-		
 	return bless {}, $class;
 }
 
@@ -113,8 +103,14 @@ sub getpwd {
 
 	# encrypt the password
 	my $encpwd = $cipher->encrypt_hex($pwd);
+
+	# open in current directory for appending
+	# create it if it does not exist
+	open AFILE, ">>", $rcfile;
+		
 	#append it to the file
-	print $fh "$vfile:$encpwd\n";
+	print AFILE "$vfile:$encpwd\n";
+	close AFILE;
 	
 	# return the password
 	return $pwd;
