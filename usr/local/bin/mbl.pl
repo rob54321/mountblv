@@ -463,7 +463,7 @@ sub mountveracontainer {
 			if (! -d $veramtpt) {
 				mkdir $veramtpt;
 			}		
-                	system("veracrypt -k \"\" --fs-options=uid=robert,gid=robert,umask=007 --pim=0 --protect-hidden=no -p $password $verafile $veramtpt");		
+              	system("veracrypt -k \"\" --fs-options=uid=robert,gid=robert,umask=007 --pim=0 --protect-hidden=no -p $password $verafile $veramtpt");		
 			print "mounted $verafile at $veramtpt\n";
 			# mtab has been altered and must be read again
 			$mtab = `cat /etc/mtab`;
@@ -627,7 +627,7 @@ sub mountbl {
 # 2. mount /mnt/bde/bde[index] at disk mount point
 # this sub takes a list of bitlocker mount points
 # and foreach mountpoint gets the password, device and next available index
-# it calls mountbl(device password mountpoint index) if the drive is not mounted
+# it calls mountbl(device dlabel password mountpoint index) if the drive is not mounted
 sub findbitlockerdevices {
 
 	# drivelist contains 'all' or a space separated list of drive mountpoints to be mounted
@@ -771,10 +771,10 @@ if ($opt_m) {
 		# and make a list of vera mtpts/vera files/vera labels
 		# make a list of command line parameters
 		my @cllist = split /\s+/, $opt_m;
-
+		my @blmtpts = ();
+		my @vlist = ();
 
 		# make a list of known bit locker disk mount points in cllist that are attached
-		my @blmtpts = ();
 		foreach my $blmtpt (keys(%attachedblmtpts)) {
 			my $dlabel = $attachedblmtpts{$blmtpt}->[2];
 			# push bl mountpoint onto blmtpts if blmtpt is a mountpoint or disk label
@@ -784,7 +784,6 @@ if ($opt_m) {
 			
 		# check the cllist for vera arguments add them to vlist
 		# make a list of all possible vera arguments
-		my @vlist = ();
 		my @veraargs = (@attachedveralabels, @attachedverafiles, @attachedveramtpts);
 		foreach my $arg (@cllist) {
 			push @vlist,  $arg if grep /^$arg$/, @veraargs;
