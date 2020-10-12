@@ -16,47 +16,47 @@ my $version = "1.41";
 # get /etc/mtab to check for mounted devices
 my $mtab = `cat /etc/mtab`;
 
-# the hash contains password and mount point for bitlocker drives.
+# for bitlocker drives
 # the key is the partuuid
-# hash format  for each record: partuuid => [password mountpoint disk_label]
+# hash format  for each record: partuuid => [mountpoint disk_label]
 # if mount point is not given then /mnt/drive1, /mnt/drive2, etc will be used
-my %allbldev = ("7150343d-01" => [qw(coahtr3552  /mnt/axiz axiz)],
+my %allbldev = ("7150343d-01" => [qw(/mnt/axiz axiz)],
 	    "dd816708-01" => [qw(coahtr3552 "")],
-            "7f8f684f-78e2-4903-903a-c5d9ab8f36ee" => [qw(panda108 /mnt/drivec drivec)],
-	    "0007ae00-01" => [qw(coahtr3552 /mnt/ssd ssd)],
-            "766349ae-03" => [qw(coahtr3552 "" ddd)],
-	    "3157edd8-01" => [qw(coahtr3552 /mnt/chaos chaos)],
-	    "78787878-01" => [qw(coahtr3552 /mnt/ver4 ver4)]);
+            "7f8f684f-78e2-4903-903a-c5d9ab8f36ee" => [qw(/mnt/drivec drivec)],
+	    "0007ae00-01" => [qw(/mnt/ssd ssd)],
+            "766349ae-03" => [qw("" ddd)],
+	    "3157edd8-01" => [qw(/mnt/chaos chaos)],
+	    "78787878-01" => [qw(/mnt/ver4 ver4)]);
 
 # the hash vdevice contains 
-# partition label => [drive mountpoint, {verafile => [verafile_mountpoint, password]}]
+# partition label => [drive mountpoint, {verafile => verafile_mountpoint}]
 my %vdevice = ( 
-	 ssd    => ['/mnt/ssd',  {'/mnt/ssd/vera'                => ['/mnt/verassd',   'coahtr3552']}],
-	 hd3    => ['/mnt/hd3',  {'/mnt/hd3/backups/lynn/vera'   => ['/mnt/verahd3',   'coahtr3552']}],
-	 hd2    => ['/mnt/hd2',  {'/mnt/hd2/backups/lynn/vera'   => ['/mnt/verahd2',   'coahtr3552']}],
-	 hdint  => ['/mnt/hdint',{'/mnt/hdint/backups/lynn/vera' => ['/mnt/verahdint', 'coahtr3552']}],
-	 ad64   => ['/mnt/ad64', {'/mnt/ad64/vera'               => ['/mnt/veraad64',  'coahtr3552'],
-						 '/mnt/ad64/backups/vera'       => ['/mnt/veraad641', 'coahtr3552'],
-			          	 '/mnt/ad64/v2/vera'            => ['/mnt/veraad642', 'coahtr3552'],
-			          	 '/mnt/ad64/v3/vera'            => ['/mnt/veraad643', 'coahtr3552'],
-			            	 '/mnt/ad64/v4/vera'            => ['/mnt/veraad644', 'coahtr3552'],
-			          	 '/mnt/ad64/v5/vera'            => ['/mnt/veraad645', 'coahtr3552'],
-			          	 '/mnt/ad64/v6/vera'            => ['/mnt/veraad646', 'coahtr3552']}],
-	 win    => ['/mnt/win',  {'/mnt/win/lynn/vera'           => ['/mnt/verawin',   'coahtr3552']}],
-	 tosh   => ['/mnt/tosh', {'/mnt/tosh/backups/lynn/vera'  => ['/mnt/veratosh',  'coahtr3552']}],
-	 trans  => ['/mnt/trans',{'/mnt/trans/vera'              => ['/mnt/veratrans', 'coahtr3552'],
-          				 '/mnt/trans/backups/vera'      => ['/mnt/veratrans1','coahtr3552'],
-			                '/mnt/trans/v2/vera'           => ['/mnt/veratrans2','coahtr3552'],
-				           '/mnt/trans/v3/vera'     	  => ['/mnt/veratrans3','coahtr3552'],
-				           '/mnt/trans/v4/v2/vera'        => ['/mnt/veratrans4','coahtr3552'],
-				           '/mnt/trans/v4/v3/vera'        => ['/mnt/veratrans5','coahtr3552']}],
-	 can    => ['/mnt/can',  {'/mnt/can/backups/lynn/vera'   => ['/mnt/veracan',   'coahtr3552']}],
-	 rootfs => ['/',         {'/home/robert/vera'            => ['/mnt/verah',     'coahtr3552'],
-                               '/home/robert/v2/vera'         => ['/mnt/verah1',    'coahtr3552'],
-                               '/home/robert/v3/vera'         => ['/mnt/verah2',    'coahtr3552'],
-                               '/home/robert/v4/vera'         => ['/mnt/verah3',    'coahtr3552'],
-                               '/home/robert/v2/v3/vera'      => ['/mnt/verah4',    'coahtr3552'],
-                               '/home/robert/v2/v3/v4/vera'   => ['/mnt/verah5',    'coahtr3552']}]);
+	 ssd    => ['/mnt/ssd',  {'/mnt/ssd/vera'                => '/mnt/verassd'}]	,
+	 hd3    => ['/mnt/hd3',  {'/mnt/hd3/backups/lynn/vera'   => '/mnt/verahd3'}]	,
+	 hd2    => ['/mnt/hd2',  {'/mnt/hd2/backups/lynn/vera'   => '/mnt/verahd2'}]	,
+	 hdint  => ['/mnt/hdint',{'/mnt/hdint/backups/lynn/vera' => '/mnt/verahdint'}]	,
+	 ad64   => ['/mnt/ad64', {'/mnt/ad64/vera'               => '/mnt/veraad64'	,
+						 '/mnt/ad64/backups/vera'       => '/mnt/veraad641'	,
+			          	 '/mnt/ad64/v2/vera'            => '/mnt/veraad642'	,
+			          	 '/mnt/ad64/v3/vera'            => '/mnt/veraad643'	,
+			            	 '/mnt/ad64/v4/vera'            => '/mnt/veraad644'	,
+			          	 '/mnt/ad64/v5/vera'            => '/mnt/veraad645'	,
+			          	 '/mnt/ad64/v6/vera'            => '/mnt/veraad646'}]	,
+	 win    => ['/mnt/win',  {'/mnt/win/lynn/vera'           => '/mnt/verawin'}]	,
+	 tosh   => ['/mnt/tosh', {'/mnt/tosh/backups/lynn/vera'  => '/mnt/veratosh'}]	,
+	 trans  => ['/mnt/trans',{'/mnt/trans/vera'              => '/mnt/veratrans'	,
+          				 '/mnt/trans/backups/vera'      => '/mnt/veratrans1'	,
+			                '/mnt/trans/v2/vera'           => '/mnt/veratrans2'	,
+				           '/mnt/trans/v3/vera'     	  => '/mnt/veratrans3'	,
+				           '/mnt/trans/v4/v2/vera'        => '/mnt/veratrans4'	,
+				           '/mnt/trans/v4/v3/vera'        => '/mnt/veratrans5'}]	,
+	 can    => ['/mnt/can',  {'/mnt/can/backups/lynn/vera'   => '/mnt/veracan'}]	,
+	 rootfs => ['/',         {'/home/robert/vera'            => '/mnt/verah' 		,
+                               '/home/robert/v2/vera'         => '/mnt/verah1'		,
+                               '/home/robert/v3/vera'         => '/mnt/verah2'		,
+                               '/home/robert/v4/vera'         => '/mnt/verah3'		,
+                               '/home/robert/v2/v3/vera'      => '/mnt/verah4'		,
+                               '/home/robert/v2/v3/v4/vera'   => '/mnt/verah5'}])	;
 
 our ($opt_l, $opt_m, $opt_h, $opt_v, $opt_u, $opt_V, $opt_a);
 
@@ -71,7 +71,7 @@ my @attachedverafiles = ();
 my @attachedveramtpts = ();
 
 
-# attachedblmtpts: blmtpts => [device, password, disk_label]
+# attachedblmtpts: blmtpts => [device, disk_label]
 # devices are attached, and known to allbldev
 my %attachedblmtpts = ();
 
@@ -260,13 +260,13 @@ sub umount {
 				# un mount if not mounted
 				my $dlabel = getlabelfromvfile($arg);
 				# must use vdevice instead of vmounts because verafile may have been umounted
-				my $vmtpt = $vdevice{$dlabel}->[1]->{$arg}->[0];
+				my $vmtpt = $vdevice{$dlabel}->[1]->{$arg};
 				umountveracontainer($vmtpt);
 
 			} elsif (exists $vdevice{$arg}) {
 				# arg is a disk label. umount all vera containers associated with the label
 				foreach my $verafile (keys(%{$vdevice{$arg}->[1]})) {
-					my $vmtpt = $vdevice{$arg}->[1]->{$verafile}->[0];
+					my $vmtpt = $vdevice{$arg}->[1]->{$verafile};
 					umountveracontainer($vmtpt);
 				} # end of foreach
 
@@ -301,7 +301,7 @@ sub getlabelvfilefromvmtpt {
 	# search all attached labels for the the vera mountpoint
 	foreach my $label (@attachedveralabels) {
 		foreach my $verafile (keys(%{$vdevice{$label}->[1]})) {
-			return ($label, $verafile) if $veramtpt eq $vdevice{$label}->[1]->{$verafile}->[0];
+			return ($label, $verafile) if $veramtpt eq $vdevice{$label}->[1]->{$verafile};
 		}
 	}
 	# either label or verafile not found
@@ -363,10 +363,9 @@ sub attachedbldevices {
 			# if bitlocker device is not in allbldev, do not include it in the hash
 			# of attached bit locker devices
 			if ($partuuid and exists $allbldev{$partuuid}) {
-				# add it to the list of attachedblmtps
-				$attachedblmtpts{$allbldev{$partuuid}->[1]} = [$device,
-										$allbldev{$partuuid}->[0],
-										$allbldev{$partuuid}->[2]];
+				# add it to the list of attachedblmtps: blmtpts => [device, disk_label]
+				$attachedblmtpts{$allbldev{$partuuid}->[0]} = [$device,
+										$allbldev{$partuuid}->[1]];
 			} else {
 				# partuuid does not exist in hash
 				print "unknown BitLocker drive $device\n";
@@ -434,8 +433,7 @@ sub mountveracontainer {
 	my $verafile = shift;
 
 	# get vera mountpoint
-	my $veramtpt = $vdevice{$dlabel}->[1]->{$verafile}->[0];
-#	my $password = $vdevice{$dlabel}->[1]->{$verafile}->[1];
+	my $veramtpt = $vdevice{$dlabel}->[1]->{$verafile};
 	my $dmtpt = $vdevice{$dlabel}->[0];
 
 	# mount disk if necessary
@@ -496,8 +494,8 @@ sub makeattachedveralists {
 		my @vfilelist = keys(%{$vdevice{$label}->[1]});
 		push @attachedverafiles, @vfilelist;
 
-		foreach my $mtptref (values(%{$vdevice{$label}->[1]})) {
-			push @attachedveramtpts, $mtptref->[0];
+		foreach my $vmtpt (values(%{$vdevice{$label}->[1]})) {
+			push @attachedveramtpts, $vmtpt;
 		}
 	}
 }
@@ -648,8 +646,7 @@ sub findbitlockerdevices {
 	# for each bit locker mountpoint in cl args mount drive if it is  not mounted
 	foreach my $blmtpt (keys(%attachedblmtpts)) {
 		my $device = $attachedblmtpts{$blmtpt}->[0];
-		my $dlabel = $attachedblmtpts{$blmtpt}->[2];
-#		my $password = $attachedblmtpts{$blmtpt}->[1];
+		my $dlabel = $attachedblmtpts{$blmtpt}->[1];
 
 		if (($blmtpts[0] eq "all") or (grep /^$blmtpt$/, @blmtpts)) {
 
@@ -725,7 +722,7 @@ if ($opt_l) {
 	foreach my $dlabel (keys(%vmounts)) {
 		# print disk was mounted if mbl mounted the disk
 		# vdiskmounts has mountpoint of drive mounted by mbl
-		# %vdevice: partition label => [drive mountpoint, {verafile => [verafile_mountpoint, password]}]
+		# %vdevice: partition label => [drive mountpoint, {verafile => verafile_mountpoint}]
 
 		my $dmtpt = $vdevice{$dlabel}->[0];
 		if (grep /^$dmtpt$/, @vdiskmounts) {
@@ -776,7 +773,7 @@ if ($opt_m) {
 
 		# make a list of known bit locker disk mount points in cllist that are attached
 		foreach my $blmtpt (keys(%attachedblmtpts)) {
-			my $dlabel = $attachedblmtpts{$blmtpt}->[2];
+			my $dlabel = $attachedblmtpts{$blmtpt}->[1];
 			# push bl mountpoint onto blmtpts if blmtpt is a mountpoint or disk label
 			push @blmtpts, $blmtpt if grep /^$blmtpt$/, @cllist;
 			push @blmtpts, $blmtpt if grep /^$dlabel$/, @cllist;
