@@ -4,7 +4,7 @@
 use strict;
 use warnings;
 use Getopt::Std;
-use lib "./";
+use lib "../lib/site_perl";
 use PassMan;
 
 # passManger
