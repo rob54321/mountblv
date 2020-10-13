@@ -16,7 +16,7 @@ use Crypt::Digest;
 my $cipher;
 
 # resource file
-my $rcfile = "mbl.rc";
+my $rcfile = "$ENV{'HOME'}/.mbl.rc";
 
 # constructor
 sub new {
