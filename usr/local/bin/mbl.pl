@@ -57,7 +57,7 @@ my %vdevice = (
                                '/home/robert/v2/v3/vera'      => '/mnt/verah4'		,
                                '/home/robert/v2/v3/v4/vera'   => '/mnt/verah5'}])	;
 
-our ($opt_l, $opt_m, $opt_h, $opt_v, $opt_u, $opt_V, $opt_a);
+our ($opt_d, $opt_c, $opt_l, $opt_m, $opt_h, $opt_v, $opt_u, $opt_V, $opt_a);
 
 # each (key,value) of %vmounts is dlabel => {vfile => vmtpt}
 my %vmounts = ();     # %vmounts = (dlabel => {vfile => vmtpt})
@@ -389,6 +389,8 @@ sub defaultparameter {
 	my %defparam = ( -m => "all",
 			 -b => "all",
 			 -v => "all",
+			 -c => "all",
+			 -d => "all",
 			 -u => "all");
 
 	# for each switch in the defparam hash find it's index and insert default arguments if necessary
@@ -681,15 +683,17 @@ defaultparameter();
 #print "after:  @ARGV\n";
 
 # get command line options
-getopts('lm:u:hV');
+getopts('lm:u:hVd:c:');
 
 # usage for -h or no command line parameters
 if ($opt_h or $no == 0) {
-	print "mbl.pl -m to mount all or list to mount [veralabel|vmtpt|verafile|blmtpt|bllabel]\n";
-	print "mbl.pl -u to umount everthing that was mounted or [veralabel|veramtpt|verfile|bitlocker_mtpt]\n";
-	print "mbl.pl -l list all mounted bitlocker drives and veracrypt containers";
-	print "mbl.pl -h to get this help\n";
-	print "mbl.pl -V to get the version number\n";
+	print "-m to mount all or list to mount [veralabel|vmtpt|verafile|blmtpt|bllabel]\n";
+	print "-u to umount everthing that was mounted or [veralabel|veramtpt|verfile|bitlocker_mtpt]\n";
+	print "-l list all mounted bitlocker drives and veracrypt containers\n";
+	print "-d delete all passwords or list [veralabel|vmtpt|verafile]\n";
+	print "-c change/set password of all vera devices or list [veralabel|veramtpt|verafile]\n";
+	print "-h to get this help\n";
+	print "-V to get the version number\n";
 	exit 0;
 }
 
@@ -699,6 +703,83 @@ if ($opt_V) {
 	exit 0;
 }
 
+# create PassMan if -d, -c or -m given
+# create PassManger
+$passman = PassMan->new() if $opt_d or $opt_c or $opt_m;
+	
+
+# delete password or delete all passwords
+if ($opt_d) {
+	# delete resource file if all given
+	if ($opt_d eq "all") {
+		$passman->delpwd("all");
+	} else {
+		# list of items to delete, must be vera files or bitlocker disk labels
+		my @deletelist = ();
+
+		# delete individual items
+		# opt_d is a string containg a list of dlabel|verafile|veramtpt|bitlocker_mtpt|bitlocker_label
+		my @list = split /\s+/, $opt_d;
+
+		# make a lists of all vera files, vera mtpts, bitlocker_dlabels and bitlocker_mtpts
+		my @verafiles = ();
+		my @veramtpts = ();
+		my @bldlabels = ();
+		my @blmtpts = ();
+		
+		# make a list of all known vera files and mtpts
+		foreach my $dlabel (keys(%vdevice)) {
+			push @verafiles, keys(%{$vdevice{$dlabel}->[1]});
+			push @veramtpts, values(%{$vdevice{$dlabel}->[1]});
+		}
+		# make lists for bitlocker_dlabels and bitlocker_mtpts
+		foreach my $partuuid (keys(%allbldev)) {
+			push @blmtpts, $allbldev{$partuuid}->[0];
+			push @bldlabels, $allbldev{$partuuid}->[1];
+		}
+	
+		
+		# each item in list must be replaced with a verafile or bitlocker_disk_label
+		foreach my $item (@list) {
+			# is item a vera disk label
+			if ($vdevice{$item}) {
+				# item is a vera disk label
+				# add all vera files for the label
+				push @deletelist, keys(%{$vdevice{$item}->[1]});
+			} elsif (grep /^$item$/, @verafiles) {
+				# if item is a vera file
+				push @deletelist, $item;
+			} elsif (grep /^$item$/, @veramtpts) {
+				# item is a vera mtpt, find verafile
+				foreach my $dlabel (keys(%vdevice)) {
+					foreach my $vfile (keys(%{$vdevice{$dlabel}->[1]})) {
+						# add vera file for the particular mtpt to the delet list
+						push @deletelist, $vfile if $vdevice{$dlabel}->[1]->{$vfile} eq $item;
+					}
+				}
+			} elsif (grep /^$item$/, @bldlabels) {
+				# item is a bitlocker disk label
+				push @deletelist, $item;
+			} elsif (grep /^$item$/, @blmtpts) {
+				# item is a bitlocker mount point
+				# find the disk label
+				foreach my $partuuid (keys(%allbldev)) {
+					push @deletelist, $allbldev{$partuuid}->[1] if $allbldev{$partuuid}->[0] eq $item;
+				}
+			} else {
+				# unknow item
+				print "$item is unknown\n";
+			}
+		} # end foreach item
+		# delete the items
+		foreach my $item (@deletelist) {
+			# print "deleting password for $item\n";
+			my $rc = $passman->delpwd($item);
+			print "deleted password for $item\n" if $rc;
+			print "password not found for $item\n" unless $rc;
+		}
+	} # end if opt_d
+}
 
 # to unmount devices
 if ($opt_u) {
@@ -752,9 +833,6 @@ if ($opt_l) {
 
 # if -m given to mount everything or any combo of bitlocker drives or vera containers
 if ($opt_m) {
-	# create PassManger
-	$passman = new PassMan();
-	
 	attachedbldevices();
 	makeattachedveralists();
 	if ($opt_m eq "all") {
