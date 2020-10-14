@@ -122,16 +122,27 @@ sub getpwd {
 # returns undef if filename not found
 sub delpwd {
 	my $self = shift;
-	my $vfile = shift;
+	my $file = shift;
 
+	# if file eq "all"
+	# remove rcfile
+	if ($file eq "all") {
+		print "Answer yes if you want to delete $rcfile:\n";
+		my $answer = <STDIN>;
+		chomp($answer);
+		if ($answer eq "yes") {
+			unlink($rcfile);
+			print "deleted $rcfile\n";
+		}
+	}	
 	# search for verafile
-	my $pwd = $self->searchrc($vfile);
+	my $pwd = $self->searchrc($file);
 	return undef unless $pwd;
 		
 	# replace / with \/ for sed
 	# delete password line in file
-	$vfile =~ s/\//\\\//g;
-	system("sed -i -e '/$vfile/d' $rcfile");
+	$file =~ s/\//\\\//g;
+	system("sed -i -e '/$file/d' $rcfile");
 	return 1;
 }
 1;
