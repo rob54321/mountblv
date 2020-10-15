@@ -83,7 +83,7 @@ sub searchrc {
 }
 
 # method to get the pwd if it exits in mbl.rc
-# if it does not exist, it must be created.
+# if it does not exist, it must be prompted for
 # mbl.rc:  filename:encrypted_password
 # getpwd(verafile)
 sub getpwd {
