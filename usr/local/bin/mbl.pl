@@ -673,6 +673,64 @@ sub findbitlockerdevices {
 	print "No more BitLocker drives found to mount\n" if $nobl == 0;
 }
 
+# sub to get verafile(s) or bitlocker_label
+# from a string
+# returns undef if not found
+# returns a list containing the verafile or bitlocker_dlabel or a list of verafiles
+# if a vera_dlabel was passed.
+sub getvfileorbllabel {
+	my $arg = shift;
+
+	# make a lists of all vera files, vera mtpts, bitlocker_dlabels and bitlocker_mtpts
+	my @verafiles = ();
+	my @veramtpts = ();
+	my @bldlabels = ();
+	my @blmtpts = ();
+	
+	# make a list of all known vera files and mtpts
+	foreach my $dlabel (keys(%vdevice)) {
+		push @verafiles, keys(%{$vdevice{$dlabel}->[1]});
+		push @veramtpts, values(%{$vdevice{$dlabel}->[1]});
+	}
+	# make lists for bitlocker_dlabels and bitlocker_mtpts
+	foreach my $partuuid (keys(%allbldev)) {
+		push @blmtpts, $allbldev{$partuuid}->[0];
+		push @bldlabels, $allbldev{$partuuid}->[1];
+	}
+
+	
+	# the corresponding verafile(s) or bitlocker_label must be returned for the arg
+	# is item a vera disk label
+	my @list = ();
+	if ($vdevice{$arg}) {
+		# item is a vera disk label
+		# add all vera files for the label
+		return keys(%{$vdevice{$arg}->[1]});
+	} elsif (grep /^$arg$/, @verafiles) {
+		# if item is a vera file
+		return $arg;
+	} elsif (grep /^$arg$/, @veramtpts) {
+		# item is a vera mtpt, find verafile
+		foreach my $dlabel (keys(%vdevice)) {
+			foreach my $vfile (keys(%{$vdevice{$dlabel}->[1]})) {
+				# add vera file for the particular mtpt to the delet list
+				return $vfile if $vdevice{$dlabel}->[1]->{$vfile} eq $arg;
+			}
+		}
+	} elsif (grep /^$arg$/, @bldlabels) {
+		# item is a bitlocker disk label
+		return $arg;
+	} elsif (grep /^$arg$/, @blmtpts) {
+		# item is a bitlocker mount point
+		# find the disk label
+		foreach my $partuuid (keys(%allbldev)) {
+			return $allbldev{$partuuid}->[1] if $allbldev{$partuuid}->[0] eq $arg;
+		}
+	} else {
+		# unknow item
+		return undef;
+	}
+}
 ############################
 # main entry point
 ############################
@@ -709,74 +767,31 @@ $passman = PassMan->new() if $opt_d or $opt_c or $opt_m;
 	
 
 # delete password or delete all passwords
+# the parameter can be all, if no command line parameters are passed
+# or verafile|veramtpt|vera_dlabel|bitlocker_dlabel|bitlocker_mtpt
 if ($opt_d) {
 	# delete resource file if all given
 	if ($opt_d eq "all") {
 		$passman->delpwd("all");
 	} else {
-		# list of items to delete, must be vera files or bitlocker disk labels
-		my @deletelist = ();
-
-		# delete individual items
+		# make a list of items to delete
 		# opt_d is a string containg a list of dlabel|verafile|veramtpt|bitlocker_mtpt|bitlocker_label
 		my @list = split /\s+/, $opt_d;
 
-		# make a lists of all vera files, vera mtpts, bitlocker_dlabels and bitlocker_mtpts
-		my @verafiles = ();
-		my @veramtpts = ();
-		my @bldlabels = ();
-		my @blmtpts = ();
-		
-		# make a list of all known vera files and mtpts
-		foreach my $dlabel (keys(%vdevice)) {
-			push @verafiles, keys(%{$vdevice{$dlabel}->[1]});
-			push @veramtpts, values(%{$vdevice{$dlabel}->[1]});
-		}
-		# make lists for bitlocker_dlabels and bitlocker_mtpts
-		foreach my $partuuid (keys(%allbldev)) {
-			push @blmtpts, $allbldev{$partuuid}->[0];
-			push @bldlabels, $allbldev{$partuuid}->[1];
-		}
-	
-		
-		# each item in list must be replaced with a verafile or bitlocker_disk_label
+		# delete the items
 		foreach my $item (@list) {
-			# is item a vera disk label
-			if ($vdevice{$item}) {
-				# item is a vera disk label
-				# add all vera files for the label
-				push @deletelist, keys(%{$vdevice{$item}->[1]});
-			} elsif (grep /^$item$/, @verafiles) {
-				# if item is a vera file
-				push @deletelist, $item;
-			} elsif (grep /^$item$/, @veramtpts) {
-				# item is a vera mtpt, find verafile
-				foreach my $dlabel (keys(%vdevice)) {
-					foreach my $vfile (keys(%{$vdevice{$dlabel}->[1]})) {
-						# add vera file for the particular mtpt to the delet list
-						push @deletelist, $vfile if $vdevice{$dlabel}->[1]->{$vfile} eq $item;
-					}
-				}
-			} elsif (grep /^$item$/, @bldlabels) {
-				# item is a bitlocker disk label
-				push @deletelist, $item;
-			} elsif (grep /^$item$/, @blmtpts) {
-				# item is a bitlocker mount point
-				# find the disk label
-				foreach my $partuuid (keys(%allbldev)) {
-					push @deletelist, $allbldev{$partuuid}->[1] if $allbldev{$partuuid}->[0] eq $item;
+			# print "deleting password for $item\n";
+			my @deletelist = getvfileorbllabel($item);
+			# delete item if it is defined
+			if ($deletelist[0]) {			
+				foreach my $arg (@deletelist) {
+					my $rc = $passman->delpwd($arg);
+					print "deleted password for $arg\n" if $rc;
+					print "password not found for $arg\n" unless $rc;
 				}
 			} else {
-				# unknow item
 				print "$item is unknown\n";
 			}
-		} # end foreach item
-		# delete the items
-		foreach my $item (@deletelist) {
-			# print "deleting password for $item\n";
-			my $rc = $passman->delpwd($item);
-			print "deleted password for $item\n" if $rc;
-			print "password not found for $item\n" unless $rc;
 		}
 	} # end if opt_d
 }
