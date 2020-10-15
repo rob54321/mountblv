@@ -673,14 +673,20 @@ sub findbitlockerdevices {
 	print "No more BitLocker drives found to mount\n" if $nobl == 0;
 }
 
-# sub to get verafile(s) or bitlocker_label
-# from a string
-# returns undef if not found
+# sub to get verafile(s) or bitlocker_labels from an input string
+# parameters passed: inputstring, ref to empty hash
+# vera file(s) and bllabels are returned in the hash
+# the hash will be populated
+# {verafile => [vfile1, vfile2, ...]
+# bllabel  => [bllabel1, bllabel2,...]}
+# returns ref to empty hash if nothing found
 # returns a list containing the verafile or bitlocker_dlabel or a list of verafiles
 # if a vera_dlabel was passed.
-sub getvfileorbllabel {
-	my $arg = shift;
-
+sub getvfilesandbllabels {
+	my $inputstring = shift;
+	my $href = shift; # ref to empty hash
+	my @args = split /\s+/, $inputstring;
+		
 	# make a lists of all vera files, vera mtpts, bitlocker_dlabels and bitlocker_mtpts
 	my @verafiles = ();
 	my @veramtpts = ();
@@ -699,37 +705,48 @@ sub getvfileorbllabel {
 	}
 
 	
-	# the corresponding verafile(s) or bitlocker_label must be returned for the arg
-	# is item a vera disk label
-	my @list = ();
-	if ($vdevice{$arg}) {
-		# item is a vera disk label
-		# add all vera files for the label
-		return keys(%{$vdevice{$arg}->[1]});
-	} elsif (grep /^$arg$/, @verafiles) {
-		# if item is a vera file
-		return $arg;
-	} elsif (grep /^$arg$/, @veramtpts) {
-		# item is a vera mtpt, find verafile
-		foreach my $dlabel (keys(%vdevice)) {
-			foreach my $vfile (keys(%{$vdevice{$dlabel}->[1]})) {
-				# add vera file for the particular mtpt to the delet list
-				return $vfile if $vdevice{$dlabel}->[1]->{$vfile} eq $arg;
+	# the hash must be made up of verafile(s) or bllabel(s) with the appropriate key
+	my @vfiles = ();
+	my @bllabels = ();
+	my @unknown = ();
+	foreach my $arg (@args) {
+		if ($vdevice{$arg}) {
+			# item is a vera disk label
+			# add all vera files for the label
+			push @vfiles, keys(%{$vdevice{$arg}->[1]});
+			
+		} elsif (grep /^$arg$/, @verafiles) {
+			# if item is a vera file
+			push @vfiles, $arg;
+			
+		} elsif (grep /^$arg$/, @veramtpts) {
+			# item is a vera mtpt, find verafile
+			foreach my $dlabel (keys(%vdevice)) {
+				foreach my $vfile (keys(%{$vdevice{$dlabel}->[1]})) {
+					# add vera file for the particular mtpt to the delet list
+					push @vfiles, $vfile if $vdevice{$dlabel}->[1]->{$vfile} eq $arg;
+				}
 			}
+			
+		} elsif (grep /^$arg$/, @bldlabels) {
+			# item is a bitlocker disk label
+			push @bllabels, $arg;
+			
+		} elsif (grep /^$arg$/, @blmtpts) {
+			# item is a bitlocker mount point
+			# find the disk label
+			foreach my $partuuid (keys(%allbldev)) {
+				push @bllabels, $allbldev{$partuuid}->[1] if $allbldev{$partuuid}->[0] eq $arg;
+			}
+			
+		} else {
+			# unknown arg
+			push @unknown, $arg;
 		}
-	} elsif (grep /^$arg$/, @bldlabels) {
-		# item is a bitlocker disk label
-		return $arg;
-	} elsif (grep /^$arg$/, @blmtpts) {
-		# item is a bitlocker mount point
-		# find the disk label
-		foreach my $partuuid (keys(%allbldev)) {
-			return $allbldev{$partuuid}->[1] if $allbldev{$partuuid}->[0] eq $arg;
-		}
-	} else {
-		# unknow item
-		return undef;
-	}
+	} # end foreach $arg
+	$href->{"verafile"} = \@vfiles;
+	$href->{"bllabel"} = \@bllabels;
+	$href->{"unknown"} = \@unknown;
 }
 ############################
 # main entry point
@@ -774,28 +791,35 @@ if ($opt_d) {
 	if ($opt_d eq "all") {
 		$passman->delpwd("all");
 	} else {
-		# make a list of items to delete
-		# opt_d is a string containg a list of dlabel|verafile|veramtpt|bitlocker_mtpt|bitlocker_label
-		my @list = split /\s+/, $opt_d;
+		# get the hash of verafiles and bllabels for their password deletion
+		my %files = ();
+		getvfilesandbllabels($opt_d, \%files);
+		
+		# delete verafile passwords
+		for (my $i = 0; $i < @{$files{verafile}}; $i++) {
+			my $rc = $passman->delpwd($files{"verafile"}->[$i]);
+			print "deleted password for $files{verafile}->[$i]\n" if $rc;
+			print "password not found for $files{verafile}->[$i]\n" unless $rc;
+		}
 
-		# delete the items
-		foreach my $item (@list) {
-			# print "deleting password for $item\n";
-			my @deletelist = getvfileorbllabel($item);
-			# delete item if it is defined
-			if ($deletelist[0]) {			
-				foreach my $arg (@deletelist) {
-					my $rc = $passman->delpwd($arg);
-					print "deleted password for $arg\n" if $rc;
-					print "password not found for $arg\n" unless $rc;
-				}
-			} else {
-				print "$item is unknown\n";
-			}
+		# delete bitlocker passwords
+		for (my $i = 0; $i < @{$files{bllabel}}; $i++) {
+			my $rc = $passman->delpwd($files{bllabel}->[$i]);
+			print "deleted password for $files{bllabel}->[$i]\n" if $rc;
+			print "password not found for $files{bllabel}->[$i]\n" unless $rc;
+		}
+
+		# print error message for unknowns
+		for (my $i = 0; $i < @{$files{unknown}}; $i++) {
+			print "$files{unknown}->[$i] is unknown\n";
 		}
 	} # end if opt_d
 }
-
+# to change or set the password of a known vera file
+# 
+if ($opt_c) {
+		
+}
 # to unmount devices
 if ($opt_u) {
 	# unmount bitlocker drives and / or vera containers.
