@@ -53,9 +53,8 @@ sub new {
 	return bless {}, $class;
 }
 
-# method to find file in mbl.rc
-# returns undef if not found
-# returns the decrypted password if found
+# method to find a device password in mbl.rc
+# returns the decrypted password if found else returns undef
 # searchrc(file)
 sub searchrc {
 	my $self = shift;
@@ -63,7 +62,7 @@ sub searchrc {
 	# open resource file for reading
 	if (open RCFILE, "<", $rcfile) {
 		
-		# search for for verafile
+		# search for for verafile or bllabel
 		while (my $line = <RCFILE>) {
 			chomp($line);
 			my ($file, $encpwd) = split /:/, $line;
@@ -78,7 +77,7 @@ sub searchrc {
 		close RCFILE;
 	
 	} # end if
-	# vera file not found return undef
+	# file not found return undef
 	return undef;
 }
 
@@ -88,18 +87,30 @@ sub searchrc {
 # getpwd(verafile)
 sub getpwd {
 	my $self = shift;
-	my $vfile = shift;
+	my $device = shift;
 		
 	# search for password
-	my $pwd = $self->searchrc($vfile);
+	my $pwd = $self->searchrc($device);
 	return $pwd if $pwd;
 	
 	# filename not found
 	#prompt for the password
-	print "password not found for $vfile\n";
-	print "Enter password for $vfile\n";
+	print "password not found for $device\n";
+	print "Enter password for $device\n";
 	$pwd = <STDIN>;
 	chomp($pwd);
+	# write it to the file
+	$self->writepwd($device, $pwd);
+	
+	# return the password
+	return $pwd;
+}
+# write encrypted password to .mbl.rc
+# requires: (device_file, password)
+sub writepwd {
+	my $self = shift;
+	my $device = shift;
+	my $pwd = shift;
 
 	# encrypt the password
 	my $encpwd = $cipher->encrypt_hex($pwd);
@@ -109,12 +120,9 @@ sub getpwd {
 	open AFILE, ">>", $rcfile;
 		
 	#append it to the file
-	print AFILE "$vfile:$encpwd\n";
+	print AFILE "$device:$encpwd\n";
 	close AFILE;
-	
-	# return the password
-	return $pwd;
-}
+}	
 
 # delete a password in the resource file
 # delpwd(filename)
@@ -145,4 +153,37 @@ sub delpwd {
 	system("sed -i -e '/$file/d' $rcfile");
 	return 1;
 }
+
+# method to change a password in the .mbl.rc file
+# this method requires a verafile or bllabel
+# if the current password is found in the file
+# a new password is prompted for, encrypted and placed in the file
+# if the current password is not found, it is also prompted for.
+# a list is returned (old password, new password)
+sub changepwd {
+	my $self = shift;
+	my $device = shift;
+
+	# prompt for the new password
+	print "Enter the new password for $device\n";
+	my $newpwd = <STDIN>;
+	chomp($newpwd);
+
+	# check if the current password exists in the .mbl.rc file
+	my $curpwd = $self->searchrc($device);
+
+	# if password not found prompt for current password
+	if (! $curpwd) {
+		print "Current password not found for $device, enter it:\n";
+		$curpwd = <STDIN>;
+		chomp($curpwd);
+	} else {
+		# current password found, delete it
+		$self->delpwd($device);
+	}
+	# encrypt the new password and write it to the file
+	$self->writepwd($device, $newpwd);
+	return ($curpwd, $newpwd);	
+}
+	
 1;

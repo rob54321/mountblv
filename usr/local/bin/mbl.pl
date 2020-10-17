@@ -20,10 +20,9 @@ my $mtab = `cat /etc/mtab`;
 # hash format  for each record: partuuid => [mountpoint disk_label]
 # if mount point is not given then /mnt/drive1, /mnt/drive2, etc will be used
 my %allbldev = ("7150343d-01" => [qw(/mnt/axiz axiz)],
-	    "dd816708-01" => [qw(coahtr3552 "")],
             "7f8f684f-78e2-4903-903a-c5d9ab8f36ee" => [qw(/mnt/drivec drivec)],
 	    "0007ae00-01" => [qw(/mnt/ssd ssd)],
-            "766349ae-03" => [qw("" ddd)],
+            "766349ae-03" => [qw(/mnt/ddd ddd)],
 	    "3157edd8-01" => [qw(/mnt/chaos chaos)],
 	    "78787878-01" => [qw(/mnt/ver4 ver4)]);
 
@@ -257,7 +256,7 @@ sub umount {
 			} elsif (grep /^$arg$/, @attachedverafiles) {
 				# arg is a verafile
 				# un mount if not mounted
-				my $dlabel = getlabelfromvfile($arg);
+				my $dlabel = getdlabelfromvfile($arg);
 				# must use vdevice instead of vmounts because verafile may have been umounted
 				my $vmtpt = $vdevice{$dlabel}->[1]->{$arg};
 				umountveracontainer($vmtpt);
@@ -309,8 +308,8 @@ sub getlabelvfilefromvmtpt {
 
 # sub to get the the disk label given a vera file container of an attached vera disk
 # the label is returned or undef if the label is not found
-# the call getlabelfromvfile(vera container)
-sub getlabelfromvfile {
+# the call getdlabelfromvfile(vera container)
+sub getdlabelfromvfile {
 	my $verafile = shift;
 
 	# search all attached labels of vera disks
@@ -546,7 +545,7 @@ sub mountvera {
 				}
 			} elsif (grep(/^$arg$/, @attachedverafiles)) {
 				#argument is a vera container
-				my $label = getlabelfromvfile($arg);
+				my $label = getdlabelfromvfile($arg);
 				#print "arg is a verafile label = $label: verafile = $arg\n";
 				mountveracontainer($label, $arg);
 
@@ -682,6 +681,7 @@ sub findbitlockerdevices {
 # returns ref to empty hash if nothing found
 # returns a list containing the verafile or bitlocker_dlabel or a list of verafiles
 # if a vera_dlabel was passed.
+# if inputstring is all the full lists of verafiles and bllabels are returned in the hash
 sub getvfilesandbllabels {
 	my $inputstring = shift;
 	my $href = shift; # ref to empty hash
@@ -704,49 +704,54 @@ sub getvfilesandbllabels {
 		push @bldlabels, $allbldev{$partuuid}->[1];
 	}
 
-	
-	# the hash must be made up of verafile(s) or bllabel(s) with the appropriate key
-	my @vfiles = ();
-	my @bllabels = ();
-	my @unknown = ();
-	foreach my $arg (@args) {
-		if ($vdevice{$arg}) {
-			# item is a vera disk label
-			# add all vera files for the label
-			push @vfiles, keys(%{$vdevice{$arg}->[1]});
-			
-		} elsif (grep /^$arg$/, @verafiles) {
-			# if item is a vera file
-			push @vfiles, $arg;
-			
-		} elsif (grep /^$arg$/, @veramtpts) {
-			# item is a vera mtpt, find verafile
-			foreach my $dlabel (keys(%vdevice)) {
-				foreach my $vfile (keys(%{$vdevice{$dlabel}->[1]})) {
-					# add vera file for the particular mtpt to the delet list
-					push @vfiles, $vfile if $vdevice{$dlabel}->[1]->{$vfile} eq $arg;
+	# if the input string is "all"
+	if ($inputstring eq "all") {
+		$href->{"verafile"} = \@verafiles;
+		$href->{"bllabel"} = \@bldlabels;
+	} else {	
+		# the hash must be made up of verafile(s) or bllabel(s) with the appropriate key
+		my @vfiles = ();
+		my @bllabels = ();
+		my @unknown = ();
+		foreach my $arg (@args) {
+			if ($vdevice{$arg}) {
+				# item is a vera disk label
+				# add all vera files for the label
+				push @vfiles, keys(%{$vdevice{$arg}->[1]});
+				
+			} elsif (grep /^$arg$/, @verafiles) {
+				# if item is a vera file
+				push @vfiles, $arg;
+				
+			} elsif (grep /^$arg$/, @veramtpts) {
+				# item is a vera mtpt, find verafile
+				foreach my $dlabel (keys(%vdevice)) {
+					foreach my $vfile (keys(%{$vdevice{$dlabel}->[1]})) {
+						# add vera file for the particular mtpt to the delet list
+						push @vfiles, $vfile if $vdevice{$dlabel}->[1]->{$vfile} eq $arg;
+					}
 				}
+				
+			} elsif (grep /^$arg$/, @bldlabels) {
+				# item is a bitlocker disk label
+				push @bllabels, $arg;
+				
+			} elsif (grep /^$arg$/, @blmtpts) {
+				# item is a bitlocker mount point
+				# find the disk label
+				foreach my $partuuid (keys(%allbldev)) {
+					push @bllabels, $allbldev{$partuuid}->[1] if $allbldev{$partuuid}->[0] eq $arg;
+				}
+				
+			} else {
+				# unknown arg
+				push @unknown, $arg;
 			}
-			
-		} elsif (grep /^$arg$/, @bldlabels) {
-			# item is a bitlocker disk label
-			push @bllabels, $arg;
-			
-		} elsif (grep /^$arg$/, @blmtpts) {
-			# item is a bitlocker mount point
-			# find the disk label
-			foreach my $partuuid (keys(%allbldev)) {
-				push @bllabels, $allbldev{$partuuid}->[1] if $allbldev{$partuuid}->[0] eq $arg;
-			}
-			
-		} else {
-			# unknown arg
-			push @unknown, $arg;
-		}
-	} # end foreach $arg
-	$href->{"verafile"} = \@vfiles;
-	$href->{"bllabel"} = \@bllabels;
-	$href->{"unknown"} = \@unknown;
+		} # end foreach $arg
+		$href->{"verafile"} = \@vfiles;
+		$href->{"bllabel"} = \@bllabels;
+		$href->{"unknown"} = \@unknown;
+	} # end if inputstring
 }
 ############################
 # main entry point
@@ -789,6 +794,7 @@ $passman = PassMan->new() if $opt_d or $opt_c or $opt_m;
 if ($opt_d) {
 	# delete resource file if all given
 	if ($opt_d eq "all") {
+		# delete the .mbl.rc file
 		$passman->delpwd("all");
 	} else {
 		# get the hash of verafiles and bllabels for their password deletion
@@ -815,10 +821,74 @@ if ($opt_d) {
 		}
 	} # end if opt_d
 }
-# to change or set the password of a known vera file
-# 
+# to change or set the password of a known vera file or bitlocker device
+# for vera files password will be written to .mbl.rc and changed on the vera file
+# for bitlocker drives the password will be written to the .mbl.rc file only
+# cannot change the password on the bitlocker drive.
 if ($opt_c) {
-		
+	my %files = ();
+	# opt_c may be "all" or string of items
+
+	# required to determine if the disk containing the vera file is available for mounting
+	makeattachedveralists();
+	getvfilesandbllabels($opt_c, \%files);
+
+	# change the passwords for bitlocker devices
+	for (my $i = 0; $i < @{$files{"bllabel"}}; $i++) {
+		$passman->changepwd($files{"bllabel"}->[$i]);
+	}
+
+	# list of disks that need to be unmounted after password changes
+	my @disksmounted = ();
+	
+	# change passwords for vera files
+	for (my $i = 0; $i < @{$files{"verafile"}}; $i++) {
+
+		# get disk label to check if it is mounted
+		my $vfile = $files{verafile}->[$i];		
+
+		# get mount point
+		my $dlabel = getdlabelfromvfile($vfile);	
+
+		# the vera file must be available to change the password
+		if (! grep /^$vfile$/, @attachedverafiles) {
+			# vfile is not available
+			print "$vfile is not available\n";
+			print "\n";
+		} else {
+						
+			my $dmtpt = $vdevice{$dlabel}->[0];
+			if ($mtab !~ /\s+$dmtpt\s+/) {
+				# disk containing vfile not mounted, mount it
+				print "mounting $dlabel at $dmtpt\n";
+				mkdir $dmtpt unless -d $dmtpt;
+				system("mount $dmtpt");
+
+				# update mtab
+				$mtab = `cat /etc/mtab`;
+				# list of disks to be unmounted
+				push @disksmounted, $dmtpt;
+			} 
+			# change the password
+			my ($curpwd, $newpwd) = $passman->changepwd($vfile);
+			print "changing password for $vfile\n";
+			system("veracrypt -C $vfile --new-password=$newpwd --password=$curpwd --new-keyfiles= --pim=0 --new-pim=0 --random-source=/usr/local/bin/veracrypt");
+			print "\n";
+		} # end if ! dlabel
+	} # end for
+
+	# unmount disks that were mounted
+	foreach my $mtpt (@disksmounted) {
+		system("umount $mtpt");
+	}
+	# update mtab
+	$mtab = `cat /etc/mtab`;
+	
+	# print error message for unknowns
+	for (my $i = 0; $i < @{$files{"unknown"}}; $i++) {
+		print "$files{unknown}->[$i] is unknown\n";
+	}
+
 }
 # to unmount devices
 if ($opt_u) {
