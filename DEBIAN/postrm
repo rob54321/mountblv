@@ -1,0 +1,4 @@
+#!/bin/bash
+# postrm for mountblv
+#  uninstall cpan modules
+cpanm -U Crypt::CBC Crypt::Blowfish Crypt::Digest

@@ -2,8 +2,9 @@ Package: mountblv
 Version: 2.00
 Architecture: all
 Maintainer: Robert Key robkey@mighty.co.za
-Depends: perl,libbde-utils,veracrypt | veracrypt-src
+Depends: perl,libbde-utils, cpanminus, veracrypt | veracrypt-src
 Section: myown
 Priority: optional
 Description: This package mounts and unmounts bitlocker drives and veracrypt containers.
          Any number of bitlocker drives/vera containers can be mounted/unmounted including all.
+         There is also a password Manger which uses encrypted passwords for vera containers and bitlocker drives.

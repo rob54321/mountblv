@@ -1,0 +1,6 @@
+#!/bin/bash
+#postinst for mountblv
+# the perl modules Crypt::CBC Crypt::Blowfish Crypt::Digest must be installed
+# cpanm will only install if module is not preset.
+# also an updated module will be installed
+cpanm Crypt::CBC Crypt::Blowfish Crypt::Digest
