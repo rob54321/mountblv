@@ -872,7 +872,11 @@ if ($opt_c) {
 			# change the password
 			my ($curpwd, $newpwd) = $passman->changepwd($vfile);
 			print "changing password for $vfile\n";
-			system("veracrypt -C $vfile --new-password=$newpwd --password=$curpwd --new-keyfiles= --pim=0 --new-pim=0 --random-source=/usr/local/bin/veracrypt");
+			# find veracrypt for using as a random source
+			# if not found use /usr/local/bin/mbl.pl
+			my $filesource = `which veracrypt`;
+			$filesource = "/usr/local/bin/mbl.pl" unless $filesource;
+			system("veracrypt -C $vfile --new-password=$newpwd --password=$curpwd --new-keyfiles= --pim=0 --new-pim=0 --random-source=$filesource");
 			print "\n";
 		} # end if ! dlabel
 	} # end for
