@@ -876,6 +876,7 @@ if ($opt_c) {
 			# if not found use /usr/local/bin/mbl.pl
 			my $filesource = `which veracrypt`;
 			$filesource = "/usr/local/bin/mbl.pl" unless $filesource;
+			chomp $filesource;
 			system("veracrypt -C $vfile --new-password=$newpwd --password=$curpwd --new-keyfiles= --pim=0 --new-pim=0 --random-source=$filesource");
 			print "\n";
 		} # end if ! dlabel
