@@ -164,11 +164,6 @@ sub changepwd {
 	my $self = shift;
 	my $device = shift;
 
-	# prompt for the new password
-	print "Enter the new password for $device\n";
-	my $newpwd = <STDIN>;
-	chomp($newpwd);
-
 	# check if the current password exists in the .mbl.rc file
 	my $curpwd = $self->searchrc($device);
 
@@ -181,6 +176,12 @@ sub changepwd {
 		# current password found, delete it
 		$self->delpwd($device);
 	}
+
+	# prompt for the new password
+	print "Enter the new password for $device\n";
+	my $newpwd = <STDIN>;
+	chomp($newpwd);
+
 	# encrypt the new password and write it to the file
 	$self->writepwd($device, $newpwd);
 	return ($curpwd, $newpwd);	
