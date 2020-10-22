@@ -505,7 +505,7 @@ sub makeattachedveralists {
 # the disk is also mounted if necessary
 # hash containing all the devices that have veracrypted files on them
 # format: disk label => [device disk mountpoint, vera file, vera mountpoint, password]
-# parameters passed: either 'all' or a list of vera mountpoints to mount
+# parameters passed: either 'all' or a list of verafiles|veramtpts|dlabels
 # none returned
 
 sub mountvera {
