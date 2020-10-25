@@ -10,7 +10,7 @@ use PassMan;
 my $passman;
 
 # the version
-my $version = "2.03";
+my $version = "2.04";
 
 # get /etc/mtab to check for mounted devices
 my $mtab = `cat /etc/mtab`;
@@ -77,6 +77,19 @@ my %attachedblmtpts = ();
 # get no of command line arguments
 my $no = @ARGV;
 
+# sub to get vera disk label from vera disk mountpoint
+#getvdlabelfromdmtpt($vdmtpt)
+# returns the vera disk label or undef if not found
+sub getvdlabelfromdmtpt {
+	my $dmtpt = shift;
+	# search hash
+	foreach my $vdlabel (keys(%vdevice)) {
+		return $vdlabel if $vdevice{$vdlabel}->[0] eq $dmtpt;
+	}
+	# not found
+	return undef;
+}
+
 # sub to umount vera container, update vmounts, mtab and check
 # if the disk can be unmounted. The correct line is removed from /tmp/veralist
 # the call: umountveracontainer(vera_mtpt)
@@ -89,8 +102,8 @@ sub umountveracontainer {
 		rmdir "$vmtpt";
 		# get the label and vera file
 		my ($dlabel, $verafile) = getlabelvfilefromvmtpt($vmtpt);
-		print "umounted $verafile mounted at $vmtpt\n";
-		print "removed $vmtpt\n";
+		printf "%-35s\t\t %s\n", "unmounted $verafile", "$vmtpt";		
+
 		# delete line in /tmp/veralist with vera mtpt in it
 		$vmtpt =~ s/\//\\\//g;
 		# file lines label:dmtpt:vera_file:vera_mtpt
@@ -187,16 +200,14 @@ sub umountbl {
 
 	# unmount mountpoint then encrypted file
 	system("umount $dmtpt");
-	print "umounted $dmtpt\n";
+	print "unmounted $dmtpt\n";
 	if ($blmounts{$dmtpt}->[2] eq "created") {
 		# mbl.pl create directory, remove it
 		rmdir "$dmtpt";
-		print "removed $dmtpt\n";
 	}
 	# unmount encrypted file and remove directory
 	system("umount $encfilemtpt");
 	rmdir "$encfilemtpt";
-	print "removed $encfilemtpt\n";
 	# delete line with mountpoint in /tmp/bitlockermounted
 	$dmtpt =~ s/\//\\\//g;
 	system("sed -i -e '/:$dmtpt:/d' /tmp/bitlockermounted");
@@ -218,9 +229,9 @@ sub umount {
 		# remove all vera mtpts
 		foreach my $dlabel (keys(%vmounts)) {
 			foreach my $verafile (keys(%{$vmounts{$dlabel}})) {
-				print "umounted $verafile mounted at $vmounts{$dlabel}->{$verafile}\n";
+				printf "%-35s\t\t %s\n", "unmounted $verafile", "$vmounts{$dlabel}->{$verafile}";		
+#				print "umounted $verafile mounted at $vmounts{$dlabel}->{$verafile}\n";
 				rmdir "$vmounts{$dlabel}->{$verafile}";
-				print "removed $vmounts{$dlabel}->{$verafile}\n";
 			}
 		}
 		unlink "/tmp/veralist";
@@ -231,7 +242,10 @@ sub umount {
 		# and delete file
 		foreach my $dmtpt (@vdiskmounts) {
 			system("umount $dmtpt");
-			print "umounted vera $dmtpt\n";
+			
+			# get the disk label
+			my $vdlabel = getvdlabelfromdmtpt($dmtpt);
+			printf "%-35s\t\t %s\n", "unmounted vera drive", "$vdlabel";
 		}
 		unlink "/tmp/veradrivelist";
 		print "\n";
@@ -462,7 +476,8 @@ sub mountveracontainer {
 				mkdir $veramtpt;
 			}		
               	system("veracrypt -k \"\" --fs-options=uid=robert,gid=robert,umask=007 --pim=0 --protect-hidden=no -p $password $verafile $veramtpt");		
-			print "mounted $verafile at $veramtpt\n";
+			printf "%-35s\t\t %s\n", "$verafile", "$veramtpt";		
+#			print "mounted $verafile at $veramtpt\n";
 			# mtab has been altered and must be read again
 			$mtab = `cat /etc/mtab`;
 		} else {			
@@ -525,6 +540,7 @@ sub mountvera {
 	if ($veralist[0] and ($veralist[0] eq "all")) {
 		# mount all devices and all vera containers
 		foreach my $label (@attachedveralabels) {
+			print "\n";
 			# for each label there could be multiple vera containers
 			foreach my $verafile (keys(%{$vdevice{$label}->[1]})) {
 				mountveracontainer($label, $verafile);
@@ -538,6 +554,7 @@ sub mountvera {
 			if (grep (/^$arg$/, @attachedveralabels)) {
 				# argument is a disk label
 				# mount all vera files on disk label
+				print "\n";
 				foreach my $verafile (keys(%{$vdevice{$arg}->[1]})) {
 					# mount vera file
 					#print "arg is a label = $arg: verafile = $verafile\n";
@@ -584,9 +601,11 @@ sub mountbl {
 
 	# make directory if it does not exist for mounting the encrypted drive file
 	mkdir ("/mnt/bde$index") if ! -e "/mnt/bde$index";
-	system ("bdemount -p $password $device /mnt/bde$index");
+	system ("bdemount -p $password $device /mnt/bde$index 2>&1 > /tmp/bdemount");
 	sleep 2;
-	print "mounted $device on /mnt/bde$index\n";
+	print "\n";
+	printf "%-35s\t\t %s\n", "mounted $device", "/mnt/bde$index";		
+#	print "mounted $device on /mnt/bde$index\n";
 
 	# mount drive file under mountpoint if the variable $mountpoint is defined
 	if ($mountpoint) {
@@ -606,7 +625,9 @@ sub mountbl {
 			print LISTMOUNTED "$dlabel:$mountpoint:/mnt/bde$index:exists\n";
 		}
 		# mount the decrypted file
-		print "mounted /mnt/bde$index/bde1 on $mountpoint\n";
+		#print "mounted /mnt/bde$index/bde1 on $mountpoint\n";
+		printf "%-35s\t\t %s\n", "mounted /mnt/bde$index/bde1", "$mountpoint";		
+
 		system("mount -o loop,ro,uid=robert,gid=robert,umask=007 /mnt/bde$index/bde1 $mountpoint");
 	} else {
 		# $mountpoint is not defined so directory /mnt/drive$index is used
