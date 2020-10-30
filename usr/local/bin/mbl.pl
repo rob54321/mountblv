@@ -10,7 +10,7 @@ use PassMan;
 my $passman;
 
 # the version
-my $version = "2.05";
+my $version = "2.06";
 
 # get /etc/mtab to check for mounted devices
 my $mtab = `cat /etc/mtab`;
