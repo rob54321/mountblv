@@ -452,10 +452,22 @@ sub mountveracontainer {
 
 	# mount disk if necessary
 	if ($mtab !~ /\s+$dmtpt\s+/) {
-		# mount disk
-		my $dmount = "mount " . $dmtpt;
-		system($dmount);
-		print "mounted $dmtpt\n";
+
+		# check that the disk mount point is in fstab
+		# if not then the disk must be mounted manually
+		mkdir $dmtpt unless -d $dmtpt;
+		my $rc = system("grep $dmtpt /etc/fstab > /dev/null 2>&1");
+		if ($rc == 0) {
+			# disk entry in fstab
+			system("mount $dmtpt");
+			print "mounted $dmtpt\n";
+		} else {
+			# entry not in fstab
+			# mount it by: mount -L label /mnt/label
+			system("mount -L $dlabel $dmtpt");
+			print "mounted $dmtpt, not in fstab\n";
+		}
+			
 		# append mountpoint to /tmp/veradrivelist
 		print VDRIVELIST $dmtpt . "\n";
 
