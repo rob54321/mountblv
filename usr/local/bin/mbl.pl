@@ -104,22 +104,10 @@ sub umountveracontainer {
 		my ($dlabel, $verafile) = getlabelvfilefromvmtpt($vmtpt);
 		printf "%-35s\t\t %s\n", "unmounted $verafile", "$vmtpt";		
 
-		# delete line in /tmp/veralist with vera mtpt in it
-		$vmtpt =~ s/\//\\\//g;
-		# file lines label:dmtpt:vera_file:vera_mtpt
-		system("sed -i -e '/:$vmtpt\$/d' /tmp/veralist");
 		# delete this entry in hash %vmounts so it is up to date
 		delete $vmounts{$dlabel}->{$verafile};
 		# check if disk with vera container should be unmounted
 
-		###########################################
-		# testing
-		#foreach my $label (keys(%vmounts)) {
-		#	foreach my $vfile (keys(%{$vmounts{$label}})) {
-		#		print "$label => $vfile => $vmounts{$label}->{$vfile}\n";
-		#	}
-		#}
-		############################################
 		if (! keys(%{$vmounts{$dlabel}})) {
 			my $dmtpt = $vdevice{$dlabel}->[0];
 			if (grep /^$dmtpt$/, @vdiskmounts) {
@@ -142,15 +130,21 @@ sub umountveracontainer {
 # sub to make lists of mounted devices.
 # values are read from the files /tmp/veradrivelist, /tmp/veralist, /tmp/bitlockermounted
 sub listmounteddev {
-	# make a hash of vera mounts: dlabel => {vfile => vmtpt} for each pair
-	if (open (VERALIST, "/tmp/veralist")) {
-		while (my $line = <VERALIST>) {
-			chomp ($line);
-			my ($dlabel, $dmtpt, $verafile, $veramtpt) = split /:/, $line;
+	# make a hash of vera mounts: %vmounts = (dlabel => {vfile => vmtpt}) for each pair
+	# make a list of mounted vera files using veracrypt -l
+	# each line is: 1: verafile device_mapper veramtpt
+	my @listofmtvera = `veracrypt -l 2>&1`;
+	chomp(@listofmtvera);
+
+	unless (grep /Error/,@listofmtvera) {
+		foreach my $line (@listofmtvera) {
+			my ($verafile, $veramtpt) = (split /\s+/,$line)[1,3];
+			# get disk label of vera file
+			my $dlabel = getdlabelfromvfile($verafile);
+			# get disk mount point
+			my $dmtpt = $vdevice{$dlabel}->[0];
 			$vmounts{$dlabel}->{$verafile} = $veramtpt;
 		}
-		# close
-		close(VERALIST);
 	}
 
 	# make list of vdiskmounts
@@ -174,20 +168,6 @@ sub listmounteddev {
 		# close
 		close (BLOCKMOUNTED);
 	}
-	######################################################
-	# testing #
-	#foreach my $dlabel (keys(%vmounts)) {
-	#	print "$dlabel: $vmounts{$dlabel}\n";
-	#	while (($verafile, $vmtpt) = each (%{$vmounts{$dlabel}})) {
-	#		print "dlabel $dlabel $verafile $vmtpt\n";
-	#	}
-	#}
-	#
-	#print "vdiskmounts @vdiskmounts\n";
-	#foreach my $mdir (keys(%blmounts)) {
-	#	print "mdir $mdir: encfile $blmounts{$mdir}->[0]: created $blmounts{$mdir}->[1]\n";
-	#}
-	######################################################
 }
 # sub to umount a bitlocker drive.
 # The mount point is unmounted and removed if it was created
@@ -234,7 +214,6 @@ sub umount {
 				rmdir "$vmounts{$dlabel}->{$verafile}";
 			}
 		}
-		unlink "/tmp/veralist";
 		print "\n";
 
 		#un mount all drives that were mounted
@@ -304,7 +283,7 @@ sub umount {
 }		
 	
 
-# sub to get the disk label from the vera mountpoint for attached vera disks
+# sub to get the disk label and vera file from the vera mountpoint for attached vera disks
 # the label and vera file are returned or undef if the label or verafile is not found
 # the call getlabelvfilefromvmtpt(vera container)
 sub getlabelvfilefromvmtpt {
@@ -481,7 +460,6 @@ sub mountveracontainer {
 			# mount vera file
 			# add vera mountpoint for removal later
 			my $password = $passman->getpwd($verafile);
-			print VERALIST "$dlabel:$vdevice{$dlabel}->[0]:$verafile:$veramtpt\n";
 
 			# mkdir mountpoint if it does not exist
 			if (! -d $veramtpt) {
@@ -540,9 +518,6 @@ sub mountvera {
 	# string veralist = all | list of vera mountpoints
 	my @veralist = @_;
 
-	# file for vera files: dlabel:dmountpt:verafile:veramtpt
-	open (VERALIST, ">>/tmp/veralist");
-
 	# file for mounted drives with veracrypt on them
 	# so they can be unmounted later
 	open (VDRIVELIST, ">>/tmp/veradrivelist");
@@ -590,7 +565,6 @@ sub mountvera {
 		}
 	}
 	close(VDRIVELIST);
-	close(VERALIST);
 }
 
 
@@ -859,6 +833,9 @@ if ($opt_d) {
 # for bitlocker drives the password will be written to the .mbl.rc file only
 # cannot change the password on the bitlocker drive.
 if ($opt_c) {
+	# %files = ("verafile" => [list of vera files],
+	#           "bllabel"  => [list of bitlocker labels],
+	#           "unknown"  => [list of unknown labels])
 	my %files = ();
 	# opt_c may be "all" or string of items
 
@@ -940,6 +917,7 @@ if ($opt_u) {
 # to list all bitlocker drives and veracrypt containers
 if ($opt_l) {
 	# read mounted devices from files
+	makeattachedveralists();
 	listmounteddev();
 
 	# %vmounts = (dlabel => {vfile => veramtpt})
