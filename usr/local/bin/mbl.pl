@@ -77,19 +77,6 @@ my %attachedblmtpts = ();
 # get no of command line arguments
 my $no = @ARGV;
 
-# sub to get vera disk label from vera disk mountpoint
-#getvdlabelfromdmtpt($vdmtpt)
-# returns the vera disk label or undef if not found
-#sub getvdlabelfromdmtpt {
-#	my $dmtpt = shift;
-	# search hash
-#	foreach my $vdlabel (keys(%vdevice)) {
-#		return $vdlabel if $vdevice{$vdlabel}->[0] eq $dmtpt;
-#	}
-	# not found
-#	return undef;
-#}
-
 # sub to umount vera container, update vmounts, mtab and check
 # if the disk can be unmounted. The correct line is removed from /tmp/veralist
 # the call: umountveracontainer(vera_mtpt)
@@ -202,11 +189,17 @@ sub umountbl {
 			rmdir "$dmtpt";
 		}
 		# unmount encrypted file and remove directory
-		system("umount $encfilemtpt");
-		rmdir "$encfilemtpt";
-		# delete line with mountpoint in /tmp/bitlockermounted
-		$dmtpt =~ s/\//\\\//g;
-		system("sed -i -e '/:$dmtpt:/d' /tmp/bitlockermounted");
+		my $rc = system("umount $encfilemtpt");
+		# check if encrypted file was unmounted
+		if ($rc == 0) {
+			rmdir "$encfilemtpt";
+			# delete line with mountpoint in /tmp/bitlockermounted
+			$dmtpt =~ s/\//\\\//g;
+			system("sed -i -e '/:$dmtpt:/d' /tmp/bitlockermounted");
+		} else {
+			# could not umount encrypted file
+			print "count not umount $encfilemtpt\n";
+		}
 	} else {
 		# drive could not be unmounted
 		print "count not umount $dmtpt\n";
