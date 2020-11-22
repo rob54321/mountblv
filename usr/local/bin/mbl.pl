@@ -180,7 +180,7 @@ sub umountbl {
 	my $encfilemtpt = shift;
 
 	# unmount mountpoint then encrypted file
-	my $rc = system("umount $dmtpt");
+	my $rc = system("umount $dmtpt > /dev/null 2>&1");
 	# check if drive unmounted
 	if ($rc == 0) {
 		print "unmounted $dmtpt\n";
@@ -233,7 +233,6 @@ sub umount {
 		foreach my $dmtpt (keys(%blmounts)) {
 			umountbl($dmtpt, $blmounts{$dmtpt}->[1]);
 		}
-		unlink "/tmp/bitlockermounted";
 		print "\n";
 	} else {
 		# a list was given to un mount
