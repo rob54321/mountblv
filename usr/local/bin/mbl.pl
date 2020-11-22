@@ -10,7 +10,7 @@ use PassMan;
 my $passman;
 
 # the version
-my $version = "2.07";
+my $version = "2.08";
 
 # get /etc/mtab to check for mounted devices
 my $mtab = `cat /etc/mtab`;
@@ -80,15 +80,15 @@ my $no = @ARGV;
 # sub to get vera disk label from vera disk mountpoint
 #getvdlabelfromdmtpt($vdmtpt)
 # returns the vera disk label or undef if not found
-sub getvdlabelfromdmtpt {
-	my $dmtpt = shift;
+#sub getvdlabelfromdmtpt {
+#	my $dmtpt = shift;
 	# search hash
-	foreach my $vdlabel (keys(%vdevice)) {
-		return $vdlabel if $vdevice{$vdlabel}->[0] eq $dmtpt;
-	}
+#	foreach my $vdlabel (keys(%vdevice)) {
+#		return $vdlabel if $vdevice{$vdlabel}->[0] eq $dmtpt;
+#	}
 	# not found
-	return undef;
-}
+#	return undef;
+#}
 
 # sub to umount vera container, update vmounts, mtab and check
 # if the disk can be unmounted. The correct line is removed from /tmp/veralist
@@ -98,29 +98,43 @@ sub umountveracontainer {
 
 	# un mount if not mounted
 	if ($mtab =~ /\s+$vmtpt\s+/) {
-		system("veracrypt -d $vmtpt");
-		rmdir "$vmtpt";
 		# get the label and vera file
 		my ($dlabel, $verafile) = getlabelvfilefromvmtpt($vmtpt);
-		printf "%-35s\t\t %s\n", "unmounted $verafile", "$vmtpt";		
+		my $rc = system("veracrypt -d $vmtpt > /dev/null 2>&1");
 
-		# delete this entry in hash %vmounts so it is up to date
-		delete $vmounts{$dlabel}->{$verafile};
-		# check if disk with vera container should be unmounted
+		#check if umount was successfull
+		if ($rc == 0) {
+			rmdir "$vmtpt";
+			printf "%-35s\t\t %s\n", "unmounted $verafile", "$vmtpt";		
 
-		if (! keys(%{$vmounts{$dlabel}})) {
-			my $dmtpt = $vdevice{$dlabel}->[0];
-			if (grep /^$dmtpt$/, @vdiskmounts) {
-				system("umount $dmtpt");
-				print "umount $dmtpt\n";
-				# remove line from /tmp/veradrivelist
-				$dmtpt =~ s/\//\\\//g;
-				system("sed -i -e '/$dmtpt/d' /tmp/veradrivelist");
-				# is it necessary to remove $dmtpt from @vdiskmounts
-				# i don't think so
+			# delete this entry in hash %vmounts so it is up to date
+			delete $vmounts{$dlabel}->{$verafile};
+			# check if disk with vera container should be unmounted
+
+			if (! keys(%{$vmounts{$dlabel}})) {
+				my $dmtpt = $vdevice{$dlabel}->[0];
+				if (grep /^$dmtpt$/, @vdiskmounts) {
+					my $rc = system("umount $dmtpt");
+					# check if un mounted
+					if ($rc == 0) {
+						print "umount $dmtpt\n";
+						# remove line from /tmp/veradrivelist
+						$dmtpt =~ s/\//\\\//g;
+						system("sed -i -e '/$dmtpt/d' /tmp/veradrivelist");
+						# is it necessary to remove $dmtpt from @vdiskmounts
+						# i don't think so
+					} else {
+						# disk count not be unmounted
+						print "could not umount $dmtpt\n";
+					}
+				}
+			# update $mtab
+			$mtab = `cat /etc/mtab`;
 			}
-		# update $mtab
-		$mtab = `cat /etc/mtab`;
+		} else {
+			# could not umount veracrypt file
+			printf "%-35s\t\t %s\n", "could not umount $verafile", "$vmtpt";		
+			
 		}
 	} else {
 		print "$vmtpt is not mounted\n";
@@ -128,7 +142,7 @@ sub umountveracontainer {
 
 }
 # sub to make lists of mounted devices.
-# values are read from the files /tmp/veradrivelist, /tmp/veralist, /tmp/bitlockermounted
+# values are read from the files /tmp/veradrivelist, veracrypt -l, /tmp/bitlockermounted
 sub listmounteddev {
 	# make a hash of vera mounts: %vmounts = (dlabel => {vfile => vmtpt}) for each pair
 	# make a list of mounted vera files using veracrypt -l
@@ -179,19 +193,24 @@ sub umountbl {
 	my $encfilemtpt = shift;
 
 	# unmount mountpoint then encrypted file
-	system("umount $dmtpt");
-	print "unmounted $dmtpt\n";
-	if ($blmounts{$dmtpt}->[2] eq "created") {
-		# mbl.pl create directory, remove it
-		rmdir "$dmtpt";
+	my $rc = system("umount $dmtpt");
+	# check if drive unmounted
+	if ($rc == 0) {
+		print "unmounted $dmtpt\n";
+		if ($blmounts{$dmtpt}->[2] eq "created") {
+			# mbl.pl create directory, remove it
+			rmdir "$dmtpt";
+		}
+		# unmount encrypted file and remove directory
+		system("umount $encfilemtpt");
+		rmdir "$encfilemtpt";
+		# delete line with mountpoint in /tmp/bitlockermounted
+		$dmtpt =~ s/\//\\\//g;
+		system("sed -i -e '/:$dmtpt:/d' /tmp/bitlockermounted");
+	} else {
+		# drive could not be unmounted
+		print "count not umount $dmtpt\n";
 	}
-	# unmount encrypted file and remove directory
-	system("umount $encfilemtpt");
-	rmdir "$encfilemtpt";
-	# delete line with mountpoint in /tmp/bitlockermounted
-	$dmtpt =~ s/\//\\\//g;
-	system("sed -i -e '/:$dmtpt:/d' /tmp/bitlockermounted");
-
 }
 	
 # sub umount($opt_u) parses the input argument
@@ -200,33 +219,20 @@ sub umount {
 	# get arguments
 	my @ulist = split /\s+/, $_[0];
 
-	# make a list of mounted drives, vera mountpoints and bitlocker mountpoints
-	listmounteddev();
 
 	# if all is passed unmount all.
 	if ($ulist[0] eq "all") {
-		system("veracrypt -d");
-		# remove all vera mtpts
+		# unmount all vera volumes individually
+		# this is done incase one of them does not dismount
+		# veracrypt -d only indicates one dismount fail even if several could not be dismounted
+	
+		# unmount vera file and remove all vera mtpt 
 		foreach my $dlabel (keys(%vmounts)) {
 			foreach my $verafile (keys(%{$vmounts{$dlabel}})) {
-				printf "%-35s\t\t %s\n", "unmounted $verafile", "$vmounts{$dlabel}->{$verafile}";		
-#				print "umounted $verafile mounted at $vmounts{$dlabel}->{$verafile}\n";
-				rmdir "$vmounts{$dlabel}->{$verafile}";
+				# unmount vera container
+				umountveracontainer($vmounts{$dlabel}->{$verafile});
 			}
 		}
-		print "\n";
-
-		#un mount all drives that were mounted
-		# with vera containers
-		# and delete file
-		foreach my $dmtpt (@vdiskmounts) {
-			system("umount $dmtpt");
-			
-			# get the disk label
-			my $vdlabel = getvdlabelfromdmtpt($dmtpt);
-			printf "%-35s\t\t %s\n", "unmounted vera drive", "$vdlabel";
-		}
-		unlink "/tmp/veradrivelist";
 		print "\n";
 
 		# un mount all bit locker drives
@@ -239,11 +245,13 @@ sub umount {
 	} else {
 		# a list was given to un mount
 		# umount each element in the list
-		# if the element is a label, umount all vera files
+		# if the element is a label, umount all vera files from that disk
 		# unmount disk only if all vera containers for that disk are unmounted
+		# the arg can be: verafile, vmtpt, dlabel, bllabel, bldlabel or unknown
 		foreach my $arg (@ulist) {
 			# is $arg a vera mtpt or vera container or disk label of bitlocker mountpoint?
 			if (grep /^$arg$/, @attachedveramtpts) {
+				# arg is a vera mountpoint
 				umountveracontainer($arg);
 
 			} elsif (grep /^$arg$/, @attachedverafiles) {
@@ -255,7 +263,7 @@ sub umount {
 				umountveracontainer($vmtpt);
 
 			} elsif (exists $vdevice{$arg}) {
-				# arg is a disk label. umount all vera containers associated with the label
+				# arg is a vera disk label. umount all vera containers associated with the label
 				foreach my $verafile (keys(%{$vdevice{$arg}->[1]})) {
 					my $vmtpt = $vdevice{$arg}->[1]->{$verafile};
 					umountveracontainer($vmtpt);
@@ -849,8 +857,9 @@ if ($opt_c) {
 	}
 
 	# list of disks that need to be unmounted after password changes
-	my @disksmounted = ();
-	
+	# disk_label => disk_mountpint
+	my %disksmounted = ();
+
 	# change passwords for vera files
 	for (my $i = 0; $i < @{$files{"verafile"}}; $i++) {
 
@@ -866,18 +875,24 @@ if ($opt_c) {
 			print "$vfile is not available\n";
 			print "\n";
 		} else {
-						
+			# check if vera disk containing vera file is mounted			
 			my $dmtpt = $vdevice{$dlabel}->[0];
 			if ($mtab !~ /\s+$dmtpt\s+/) {
 				# disk containing vfile not mounted, mount it
 				print "mounting $dlabel at $dmtpt\n";
 				mkdir $dmtpt unless -d $dmtpt;
-				system("mount $dmtpt");
+				my $rc = system("mount $dmtpt");
 
-				# update mtab
-				$mtab = `cat /etc/mtab`;
-				# list of disks to be unmounted
-				push @disksmounted, $dmtpt;
+				# if disk cannot be mounted skip to next verafile
+				if ($rc == 0) {
+					# update mtab
+					$mtab = `cat /etc/mtab`;
+					# list of disks to be unmounted
+					$disksmounted{$dlabel} = $dmtpt;
+				} else {
+					print "could not change password for $vfile, could not mount $dlabel\n";
+					next;
+				}
 			} 
 			# change the password
 			my ($curpwd, $newpwd) = $passman->changepwd($vfile);
@@ -890,11 +905,12 @@ if ($opt_c) {
 			system("veracrypt -C $vfile --new-password=$newpwd --password=$curpwd --new-keyfiles= --pim=0 --new-pim=0 --random-source=$filesource");
 			print "\n";
 		} # end if ! dlabel
-	} # end for
+	} # end for $i = 0
 
 	# unmount disks that were mounted
-	foreach my $mtpt (@disksmounted) {
-		system("umount $mtpt");
+	foreach my $dlabel (keys (%disksmounted)) {
+		my $rc = system("umount $disksmounted{$dlabel}");
+		print "Could not umount $dlabel at $disksmounted{$dlabel}\n" unless $rc == 0;
 	}
 	# update mtab
 	$mtab = `cat /etc/mtab`;
@@ -912,6 +928,8 @@ if ($opt_u) {
 	# the argument can be all or
 	# any one of: veramtpt, vera container, disk label, bit locker mountpoint
 	makeattachedveralists();
+	# make a list of mounted drives, vera mountpoints and bitlocker mountpoints
+	listmounteddev();
 	umount($opt_u);
 }
 # to list all bitlocker drives and veracrypt containers
