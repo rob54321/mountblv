@@ -1,3 +1,5 @@
 *.rc
 test.pl
 *.bak
+*.save
+*.ptkdb
