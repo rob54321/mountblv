@@ -597,11 +597,11 @@ sub mountbl {
 }
 # sub to mount bit locker drives.
 # bit locker drive mounted in two stages
-# 1. mount the device at /mnt/bde[index]
-# 2. mount /mnt/bde/bde[index] at disk mount point
+# 1. mount the device at mountpointenc 
+# 2. mount mountpointenc/bde1 at disk mount point using loop device
 # this sub takes a list of bitlocker mount points
-# and foreach mountpoint gets the password, device and next available index
-# it calls mountbl(device dlabel password mountpoint index) if the drive is not mounted
+# and foreach mountpoint gets the device and disk label
+# it calls mountbl(device dlabel mountpoint)
 sub findbitlockerdevices {
 
 	# drivelist contains 'all' or a space separated list of drive mountpoints to be mounted
