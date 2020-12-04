@@ -10,7 +10,7 @@ use PassMan;
 my $passman;
 
 # the version
-my $version = "2.09";
+my $version = "2.10";
 
 # read fstab into array to check for disk mounts in fstab
 # only used in mountveracontainer
@@ -189,6 +189,8 @@ sub umountbl {
 		print "unmounted $dmtpt\n";
 		# unmount encrypted file and remove directory
 		my $rc = system("umount $encfilemtpt");
+		# remove directory if umount successfull
+		rmdir $encfilemtpt if $rc == 0;
 		# check if encrypted file was unmounted
 		print "count not umount $encfilemtpt\n" unless $rc == 0;
 	} else {
