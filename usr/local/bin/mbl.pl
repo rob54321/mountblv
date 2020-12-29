@@ -10,7 +10,7 @@ use PassMan;
 my $passman;
 
 # the version
-my $version = "2.10";
+my $version = "2.11";
 
 # read fstab into array to check for disk mounts in fstab
 # only used in mountveracontainer
