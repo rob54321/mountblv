@@ -22,11 +22,10 @@ my @fstab = ();
 # hash format  for each record: partuuid => [mountpoint disk_label]
 # if mount point is not given then /mnt/drive1, /mnt/drive2, etc will be used
 my %allbldev = ("7150343d-01" => [qw(/mnt/axiz axiz)],
-            "7f8f684f-78e2-4903-903a-c5d9ab8f36ee" => [qw(/mnt/drivec drivec)],
-	    "0007ae00-01" => [qw(/mnt/ssd ssd)],
-            "766349ae-03" => [qw(/mnt/ddd ddd)],
-	    "3157edd8-01" => [qw(/mnt/chaos chaos)],
-	    "78787878-01" => [qw(/mnt/ver4 ver4)]);
+			"7f8f684f-78e2-4903-903a-c5d9ab8f36ee" => [qw(/mnt/drivec drivec)],
+			"766349ae-03" => [qw(/mnt/ddd ddd)],
+			"3157edd8-01" => [qw(/mnt/chaos chaos)],
+	       	"78787878-01" => [qw(/mnt/ver4 ver4)]);
 
 # the hash vdevice contains 
 # partition label => [drive mountpoint, {verafile => verafile_mountpoint}]
@@ -409,8 +408,11 @@ sub mountveracontainer {
 
 		# check that the disk mount point is in fstab
 		# if not then the disk must be mounted manually
+		# fstab could have
+		#LABEL=ssd /mnt/ssd ...
+		#UUID=xxxxx /mnt/ssd....
 		mkdir $dmtpt unless -d $dmtpt;
-		$rc = grep /^LABEL=$dlabel\s+$dmtpt/, @fstab;
+		$rc = grep /^LABEL=$dlabel\s+$dmtpt|^UUID=\s+$dmtpt/, @fstab;
 		if ($rc) {
 			# disk entry in fstab
 			system("mount $dmtpt");
