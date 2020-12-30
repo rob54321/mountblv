@@ -10,7 +10,7 @@ use PassMan;
 my $passman;
 
 # the version
-my $version = "2.11";
+my $version = "2.12";
 
 # read fstab into array to check for disk mounts in fstab
 # only used in mountveracontainer
@@ -412,7 +412,7 @@ sub mountveracontainer {
 		#LABEL=ssd /mnt/ssd ...
 		#UUID=xxxxx /mnt/ssd....
 		mkdir $dmtpt unless -d $dmtpt;
-		$rc = grep /^LABEL=$dlabel\s+$dmtpt|^UUID=\s+$dmtpt/, @fstab;
+		$rc = grep /^LABEL=$dlabel\s+$dmtpt|^UUID=[0-9a-f\-]+\s+$dmtpt/i, @fstab;
 		if ($rc) {
 			# disk entry in fstab
 			system("mount $dmtpt");
