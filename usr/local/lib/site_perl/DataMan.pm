@@ -55,7 +55,6 @@ sub new {
 	%{$blref} = ("7150343d-01" => [qw(/mnt/axiz axiz)],
 				"7f8f684f-78e2-4903-903a-c5d9ab8f36ee" => [qw(/mnt/drivec drivec)],
 				"766349ae-03" => [qw(/mnt/ddd ddd)],
-				"3157edd8-01" => [qw(/mnt/chaos chaos)],
 		       	"78787878-01" => [qw(/mnt/ver4 ver4)]);
 
 	# the hash vdevice contains 
@@ -80,13 +79,7 @@ sub new {
 					           '/mnt/trans/v3/vera'     	  => '/mnt/veratrans3'	,
 					           '/mnt/trans/v4/v2/vera'        => '/mnt/veratrans4'	,
 					           '/mnt/trans/v4/v3/vera'        => '/mnt/veratrans5'}]	,
-		 can    => ['/mnt/can',  {'/mnt/can/backups/lynn/vera'   => '/mnt/veracan'}]	,
-		 rootfs => ['/',         {'/home/robert/vera'            => '/mnt/verah' 		,
-	                               '/home/robert/v2/vera'         => '/mnt/verah1'		,
-	                               '/home/robert/v3/vera'         => '/mnt/verah2'		,
-	                               '/home/robert/v4/vera'         => '/mnt/verah3'		,
-	                               '/home/robert/v2/v3/vera'      => '/mnt/verah4'		,
-	                               '/home/robert/v2/v3/v4/vera'   => '/mnt/verah5'}])	;
+		 can    => ['/mnt/can',  {'/mnt/can/backups/lynn/vera'   => '/mnt/veracan'}]);
 
 	# if the resource file exists, open and read it
 	# else create a default one
@@ -110,14 +103,50 @@ sub new {
 				# each line:
 				# v:partition label:partition mount point:full verafile name:vera mountpiont
 				#
-				$vfref->{$record[1]} = [$record[2], {$record[3] => $record[4]}];
+				# if the key $record[1] (part label) exists in the hash,
+				# then the hash {verafile => vera_mountpoint must be expanded instead.
+
+				if (exists($vfref->{$record[1]})) {
+					# key exists, so elements must be added to {verafile => vera_mountpoint}
+					# check if the partition mount point is correct
+					if ($vfref->{$record[1]}[0] eq $record[2]) {
+						# part mount point correct, insert into inner hash
+						# record[3] = verafile
+						# record[4] = vera mountpoint
+						$vfref->{$record[1]}[1]->{$record[3]} = $record[4];
+					} else {
+						# partition mount not the same
+						# error in data
+						print "error in verafile $record[3]\n";
+						print "actual mtpt: $vfref->{$record[1]}[0] file mtpt: $record[2]\n";
+						print "\n";
+						print "press enter to continue...\n";
+						my $inputkey = <STDIN>;
+					}
+				} else {
+					# key does not exist, a new key can be added
+					$vfref->{$record[1]} = [$record[2], {$record[3] => $record[4]}];
+				} # end if exists
+				
 			} else {
 				# unknown record
-				print "$line is unkown\n";
+				print "unknown line: \"$line\"\n";
 			}
 		} # end while
 		close DATA;
 	} # end if open
+	####################################
+	# testing #
+	####################################
+	foreach my $key (keys(%{$vfref})) {
+		foreach my $vfile (keys(  %{$vfref->{$key}[1]}  )) {
+			print "$key $vfref->{$key}[0] $vfile $vfref->{$key}[1]->{$vfile}\n";
+		}
+	}
+
+	####################################
+	# end of testing #
+	####################################
 	
 	return bless {}, $class;
 }
