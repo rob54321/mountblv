@@ -5,9 +5,11 @@ use strict;
 use warnings;
 use Getopt::Std;
 use PassMan;
+use DataMan;
 
-# passManger
+# global vars
 my $passman;
+my $dataman;
 
 # the version
 my $version = "2.12";
@@ -21,41 +23,11 @@ my @fstab = ();
 # the key is the partuuid
 # hash format  for each record: partuuid => [mountpoint disk_label]
 # if mount point is not given then /mnt/drive1, /mnt/drive2, etc will be used
-my %allbldev = ("7150343d-01" => [qw(/mnt/axiz axiz)],
-			"7f8f684f-78e2-4903-903a-c5d9ab8f36ee" => [qw(/mnt/drivec drivec)],
-			"766349ae-03" => [qw(/mnt/ddd ddd)],
-			"3157edd8-01" => [qw(/mnt/chaos chaos)],
-	       	"78787878-01" => [qw(/mnt/ver4 ver4)]);
+my %allbldev = ();
 
 # the hash vdevice contains 
 # partition label => [drive mountpoint, {verafile => verafile_mountpoint}]
-my %vdevice = ( 
-	 ssd    => ['/mnt/ssd',  {'/mnt/ssd/vera'                => '/mnt/verassd'}]	,
-	 hd3    => ['/mnt/hd3',  {'/mnt/hd3/backups/lynn/vera'   => '/mnt/verahd3'}]	,
-	 hd2    => ['/mnt/hd2',  {'/mnt/hd2/backups/lynn/vera'   => '/mnt/verahd2'}]	,
-	 hdint  => ['/mnt/hdint',{'/mnt/hdint/backups/lynn/vera' => '/mnt/verahdint'}]	,
-	 ad64   => ['/mnt/ad64', {'/mnt/ad64/vera'               => '/mnt/veraad64'	,
-						 '/mnt/ad64/backups/vera'       => '/mnt/veraad641'	,
-			          	 '/mnt/ad64/v2/vera'            => '/mnt/veraad642'	,
-			          	 '/mnt/ad64/v3/vera'            => '/mnt/veraad643'	,
-			            	 '/mnt/ad64/v4/vera'            => '/mnt/veraad644'	,
-			          	 '/mnt/ad64/v5/vera'            => '/mnt/veraad645'	,
-			          	 '/mnt/ad64/v6/vera'            => '/mnt/veraad646'}]	,
-	 win    => ['/mnt/win',  {'/mnt/win/lynn/vera'           => '/mnt/verawin'}]	,
-	 tosh   => ['/mnt/tosh', {'/mnt/tosh/backups/lynn/vera'  => '/mnt/veratosh'}]	,
-	 trans  => ['/mnt/trans',{'/mnt/trans/vera'              => '/mnt/veratrans'	,
-          				 '/mnt/trans/backups/vera'      => '/mnt/veratrans1'	,
-			                '/mnt/trans/v2/vera'           => '/mnt/veratrans2'	,
-				           '/mnt/trans/v3/vera'     	  => '/mnt/veratrans3'	,
-				           '/mnt/trans/v4/v2/vera'        => '/mnt/veratrans4'	,
-				           '/mnt/trans/v4/v3/vera'        => '/mnt/veratrans5'}]	,
-	 can    => ['/mnt/can',  {'/mnt/can/backups/lynn/vera'   => '/mnt/veracan'}]	,
-	 rootfs => ['/',         {'/home/robert/vera'            => '/mnt/verah' 		,
-                               '/home/robert/v2/vera'         => '/mnt/verah1'		,
-                               '/home/robert/v3/vera'         => '/mnt/verah2'		,
-                               '/home/robert/v4/vera'         => '/mnt/verah3'		,
-                               '/home/robert/v2/v3/vera'      => '/mnt/verah4'		,
-                               '/home/robert/v2/v3/v4/vera'   => '/mnt/verah5'}])	;
+my %vdevice = ();
 
 our ($opt_d, $opt_c, $opt_l, $opt_m, $opt_h, $opt_v, $opt_u, $opt_V, $opt_a);
 
@@ -714,6 +686,8 @@ sub getvfilesandbllabels {
 ############################
 # main entry point
 ############################
+# populate the default values for bitlocker and vera  devices
+$dataman = DataMan->new(\%allbldev, \%vdevice);
 
 # check to see if default arguments must be supplied to -b -v -u
 #print "before: @ARGV\n";
