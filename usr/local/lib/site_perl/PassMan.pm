@@ -125,7 +125,7 @@ sub writepwd {
 }	
 
 # delete a password in the resource file
-# delpwd(filename)
+# delpwd(vera_filename)
 # returns true if successfull
 # returns undef if filename not found
 sub delpwd {

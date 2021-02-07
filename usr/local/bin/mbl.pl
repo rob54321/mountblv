@@ -406,13 +406,34 @@ sub mountveracontainer {
 		unless ($rc == 0) {
 			# mount vera file
 			# add vera mountpoint for removal later
+			# get password, if it is not in the .mbl.rc file
+			# then the user will be prompted and the password
+			# will be added to the file
 			my $password = $passman->getpwd($verafile);
 
 			# mkdir mountpoint if it does not exist
 			if (! -d $veramtpt) {
 				mkdir $veramtpt;
-			}		
-              	system("veracrypt -k \"\" --fs-options=uid=robert,gid=robert,umask=007 --pim=0 --protect-hidden=no -p $password $verafile $veramtpt");		
+			}
+
+			# mount vera file and check if successfull
+              	my $vrc = system("veracrypt -k \"\" --fs-options=uid=robert,gid=robert,umask=007 --pim=0 --protect-hidden=no -p $password $verafile $veramtpt | tee /tmp/veraerror.txt");
+			if (open VOUT,"<","/tmp/veraerror.txt") {
+				my @vout = <VOUT>;
+				chomp(@vout);
+				# check for Incorrect password
+				if (grep /Incorrect password/i, @vout) {
+					# the password in the resource file is wrong.
+					# veracrypt will have prompted for a new password
+					# and mounted the vera file. The new password is inacessable
+					# so the password in the resource file must be deleted
+					# and the next time the vera file is mounted it will be requested.
+					$passman->delpwd($verafile);
+					print "password for $verafile was incorrect, deleted password in $ENV{'HOME'}/.mbl.rc\n";
+				}
+				close VOUT;
+			}
+
 			printf "%-40s\t\t %s\n", "$verafile", "$veramtpt";		
 		} else {			
 			print "$verafile is already mounted\n";
@@ -686,11 +707,7 @@ sub getvfilesandbllabels {
 ############################
 # main entry point
 ############################
-# populate the default values for bitlocker and vera  devices
-$dataman = DataMan->new(\%allbldev, \%vdevice);
-
-# check to see if default arguments must be supplied to -b -v -u
-#print "before: @ARGV\n";
+# check to see if default arguments must be supplied to -b -v -u print "before: @ARGV\n";
 defaultparameter();
 #print "after:  @ARGV\n";
 
@@ -708,6 +725,9 @@ if ($opt_h or $no == 0) {
 	print "-V to get the version number\n";
 	exit 0;
 }
+
+# populate the default values for bitlocker and vera  devices
+$dataman = DataMan->new(\%allbldev, \%vdevice);
 
 # to get the version no
 if ($opt_V) {

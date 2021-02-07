@@ -77,8 +77,8 @@ sub new {
 	          				 '/mnt/trans/backups/vera'      => '/mnt/veratrans1'	,
 				                '/mnt/trans/v2/vera'           => '/mnt/veratrans2'	,
 					           '/mnt/trans/v3/vera'     	  => '/mnt/veratrans3'	,
-					           '/mnt/trans/v4/v2/vera'        => '/mnt/veratrans4'	,
-					           '/mnt/trans/v4/v3/vera'        => '/mnt/veratrans5'}]	,
+					           '/mnt/trans/v4/v2/vera'        => '/mnt/veratrans42'	,
+					           '/mnt/trans/v4/v3/vera'        => '/mnt/veratrans43'}]	,
 		 can    => ['/mnt/can',  {'/mnt/can/backups/lynn/vera'   => '/mnt/veracan'}]);
 
 	# if the resource file exists, open and read it
@@ -104,7 +104,7 @@ sub new {
 				# v:partition label:partition mount point:full verafile name:vera mountpiont
 				#
 				# if the key $record[1] (part label) exists in the hash,
-				# then the hash {verafile => vera_mountpoint must be expanded instead.
+				# then the hash {verafile => vera_mountpoint }must be expanded instead.
 
 				if (exists($vfref->{$record[1]})) {
 					# key exists, so elements must be added to {verafile => vera_mountpoint}
@@ -117,33 +117,28 @@ sub new {
 					} else {
 						# partition mount not the same
 						# error in data
-						print "error in verafile $record[3]\n";
+						print "error in $ENV{'HOME'}/.mbldata.rc for verafile $record[3]\n";
 						print "actual mtpt: $vfref->{$record[1]}[0] file mtpt: $record[2]\n";
 						print "\n";
-						print "press enter to continue...\n";
-						my $inputkey = <STDIN>;
+						sleep 1;
 					}
 				} else {
 					# key does not exist, a new key can be added
 					$vfref->{$record[1]} = [$record[2], {$record[3] => $record[4]}];
-				} # end if exists
+				} # end if else exists
 				
-			} else {
-				# unknown record
-				print "unknown line: \"$line\"\n";
-			}
+			} # end if else record eq b
 		} # end while
 		close DATA;
 	} # end if open
 	####################################
 	# testing #
 	####################################
-	foreach my $key (keys(%{$vfref})) {
-		foreach my $vfile (keys(  %{$vfref->{$key}[1]}  )) {
-			print "$key $vfref->{$key}[0] $vfile $vfref->{$key}[1]->{$vfile}\n";
-		}
-	}
-
+	#foreach my $key (keys(%{$vfref})) {
+	#	foreach my $vfile (keys(  %{$vfref->{$key}[1]}  )) {
+	#		print "$key $vfref->{$key}[0] $vfile $vfref->{$key}[1]->{$vfile}\n";
+	#	}
+	#}
 	####################################
 	# end of testing #
 	####################################
