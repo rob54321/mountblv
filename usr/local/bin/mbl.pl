@@ -12,7 +12,7 @@ my $passman;
 my $dataman;
 
 # the version
-my $version = "2.12";
+my $version = "2.13";
 
 # read fstab into array to check for disk mounts in fstab
 # only used in mountveracontainer
