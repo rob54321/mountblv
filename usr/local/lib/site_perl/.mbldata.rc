@@ -1,0 +1,9 @@
+b:3157edd8-01:/mnt/chaos:chaos
+v:ad64:/mnt/ad65:/mnt/ad65/vera: /mnt/vera65
+v:rootfs:/:/home/robert/vera:/mnt/verah
+v:rootfs:/:/home/robert/v2/vera:/mnt/verah1
+v:rootfs:/:/home/robert/v3/vera:/mnt/verah2
+v:rootfs:/:/home/robert/v4/vera:/mnt/verah3
+v:rootfs:/:/home/robert/v2/v3/vera:/mnt/verah4
+v:rootfs:/:/home/robert/v2/v3/v4/vera:/mnt/verah5
+v:trans:/mnt/trans:/mnt/trans/v4/vera:/mnt/veratrans4
