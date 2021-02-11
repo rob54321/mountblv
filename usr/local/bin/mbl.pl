@@ -61,7 +61,7 @@ sub umountveracontainer {
 	if ($rc == 0) {
 		# get the label and vera file
 		my ($dlabel, $verafile) = getlabelvfilefromvmtpt($vmtpt);
-		my $rc = system("veracrypt -d $vmtpt > /dev/null 2>&1");
+		my $rc = system("sudo veracrypt -d $vmtpt > /dev/null 2>&1");
 
 		#check if umount was successfull
 		if ($rc == 0) {
@@ -75,7 +75,7 @@ sub umountveracontainer {
 			if (! keys(%{$vmounts{$dlabel}})) {
 				my $dmtpt = $vdevice{$dlabel}->[0];
 				if (grep /^$dmtpt$/, @vdiskmounts) {
-					my $rc = system("umount $dmtpt");
+					my $rc = system("sudo umount $dmtpt");
 					# check if un mounted
 					if ($rc == 0) {
 						print "umount $dmtpt\n";
@@ -154,12 +154,12 @@ sub umountbl {
 	my $encfilemtpt = shift;
 
 	# unmount mountpoint then encrypted file
-	my $rc = system("umount $dmtpt > /dev/null 2>&1");
+	my $rc = system("sudo umount $dmtpt > /dev/null 2>&1");
 	# check if drive unmounted
 	if ($rc == 0) {
 		print "unmounted $dmtpt\n";
 		# unmount encrypted file and remove directory
-		my $rc = system("umount $encfilemtpt");
+		my $rc = system("sudo umount $encfilemtpt");
 		# remove directory if umount successfull
 		rmdir $encfilemtpt if $rc == 0;
 		# check if encrypted file was unmounted
@@ -387,12 +387,12 @@ sub mountveracontainer {
 		$rc = grep /^LABEL=$dlabel\s+$dmtpt|^UUID=[0-9a-f\-]+\s+$dmtpt/i, @fstab;
 		if ($rc) {
 			# disk entry in fstab
-			system("mount $dmtpt");
+			system("sudo mount $dmtpt");
 			print "mounted $dmtpt\n";
 		} else {
 			# entry not in fstab
 			# mount it by: mount -L label /mnt/label
-			system("mount -L $dlabel $dmtpt");
+			system("sudo mount -L $dlabel $dmtpt");
 			print "mounted $dmtpt, not in fstab\n";
 		}
 			
@@ -568,7 +568,7 @@ sub mountbl {
 		# get password of bitlocker drive to be mounted
 		my $password = $passman->getpwd($dlabel);
 
-		system ("bdemount -p $password $device $mtptenc > /tmp/bdemount 2>&1");
+		system ("sudo bdemount -p $password $device $mtptenc > /tmp/bdemount 2>&1");
 		sleep 2;
 		print "\n";
 		printf "%-40s\t\t %s\n", "$device mounted at", "$mtptenc";
@@ -586,7 +586,7 @@ sub mountbl {
 		# decrypted file not mounted
 		# mount the decrypted file
 		printf "%-40s\t\t %s\n", "mounted $bdefile", "$mountpoint";		
-		system("mount -o loop,ro,uid=robert,gid=robert,umask=007 $bdefile $mountpoint");
+		system("sudo mount -o loop,ro,uid=robert,gid=robert,umask=007 $bdefile $mountpoint");
 	} else {
 		# decrypted file is mounted
 		printf "%-40s\t\t %s\n", "$bdefile is already mounted at", "$mountpoint";		
@@ -819,7 +819,7 @@ if ($opt_c) {
 				# disk containing vfile not mounted, mount it
 				print "mounting $dlabel at $dmtpt\n";
 				mkdir $dmtpt unless -d $dmtpt;
-				$rc = system("mount $dmtpt");
+				$rc = system("sudo mount $dmtpt");
 
 				# if disk cannot be mounted skip to next verafile
 				if ($rc == 0) {
@@ -845,7 +845,7 @@ if ($opt_c) {
 
 	# unmount disks that were mounted
 	foreach my $dlabel (keys (%disksmounted)) {
-		my $rc = system("umount $disksmounted{$dlabel}");
+		my $rc = system("sudo umount $disksmounted{$dlabel}");
 		print "Could not umount $dlabel at $disksmounted{$dlabel}\n" unless $rc == 0;
 	}
 	
