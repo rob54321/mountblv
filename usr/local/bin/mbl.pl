@@ -12,7 +12,7 @@ my $passman;
 my $dataman;
 
 # the version
-my $version = "2.13";
+my $version = "2.14";
 
 # read fstab into array to check for disk mounts in fstab
 # only used in mountveracontainer
@@ -417,7 +417,7 @@ sub mountveracontainer {
 			}
 
 			# mount vera file and check if successfull
-              	my $vrc = system("veracrypt -k \"\" --fs-options=uid=robert,gid=robert,umask=007 --pim=0 --protect-hidden=no -p $password $verafile $veramtpt | tee /tmp/veraerror.txt");
+              	my $vrc = system("sudo veracrypt -k \"\" --fs-options=uid=robert,gid=robert,umask=007 --pim=0 --protect-hidden=no -p $password $verafile $veramtpt | tee /tmp/veraerror.txt");
 			if (open VOUT,"<","/tmp/veraerror.txt") {
 				my @vout = <VOUT>;
 				chomp(@vout);
@@ -723,6 +723,9 @@ if ($opt_h or $no == 0) {
 	print "-c change/set password of all vera devices/files or bitlocker drive or list [veralabel|veramtpt|verafile|bllabel]\n";
 	print "-h to get this help\n";
 	print "-V to get the version number\n";
+	print "\n";
+	print "mbl.pl uses sudo: /etc/sudoers.d/robert contains: robert ALL=(ALL) NOPASSWD:ALL\n";
+	print "the file must be chmod 440 owner root.root\n";
 	exit 0;
 }
 
@@ -920,28 +923,64 @@ if ($opt_m) {
 		# was given in the command line parameter
 		# make a list of bit locker arguments @bllist
 		# and make a list of vera mtpts/vera files/vera labels
-		# make a list of command line parameters
-		my @cllist = split /\s+/, $opt_m;
+		# make a list of command line arguments
+		my @clarg = split /\s+/, $opt_m;
 		my @blmtpts = ();
 		my @vlist = ();
 
-		# make a list of known bit locker disk mount points in cllist that are attached
-		foreach my $blmtpt (keys(%attachedblmtpts)) {
-			my $dlabel = $attachedblmtpts{$blmtpt}->[1];
-			# push bl mountpoint onto blmtpts if blmtpt is a mountpoint or disk label
-			push @blmtpts, $blmtpt if grep /^$blmtpt$/, @cllist;
-			push @blmtpts, $blmtpt if grep /^$dlabel$/, @cllist;
-		} # end of foreach blmtpt
-			
-		# check the cllist for vera arguments add them to vlist
+		# for each command line argument
+		# if it is bitlocker label of mountpoint - add mountpoint to @blmtpts
+		# if it is a vera file or vera mount point or vera disk label -- add it to @vlist
+		# print and error message for unknown command line parameters
+
 		# make a list of all possible vera arguments
 		my @veraargs = (@attachedveralabels, @attachedverafiles, @attachedveramtpts);
-		foreach my $arg (@cllist) {
-			push @vlist,  $arg if grep /^$arg$/, @veraargs;
+
+		# make a hash of attached bitlocker devices
+		# disk_label => blmtpt
+		my %bldevices = ();
+		foreach my $blmtpt (keys(%attachedblmtpts)) {
+			# get the disk label for the key
+			my $disk_label = $attachedblmtpts{$blmtpt}->[1];
+
+			# make the bldevices hash
+			$bldevices{$disk_label} = $blmtpt;
 		}
+		
+		# check each argument
+		foreach my $clarg (@clarg) {
+			# is argument a bitlocker or vera or unknown
+			if (grep /^$clarg$/, @veraargs) {
+				# arg is a valid vera device
+				push @vlist,  $clarg ;
+
+			# bldevices: disk_label => blmtpt
+			} elsif (grep /^$clarg$/, (values(%bldevices))) {
+				# clarg is bitlocker mount point
+				push @blmtpts, $clarg;
+				
+			# bldevices: disk_label => blmtpt
+			} elsif (grep /^$clarg$/, (keys(%bldevices))) {
+				# clarg is bitlocker label
+				# add the blmtpt
+				push @blmtpts, $bldevices{$clarg};
+			} else {
+				# the argument is unknown
+				print "$clarg is unknown\n"; 
+			}
+		}
+
+		###########################################
+		# testing
+		###########################################
+		# print "\@vlist = @vlist\n";
+		# print "\@blmtpts = @blmtpts\n";
+
+		###########################################
 		# only call the subs if there are devices to mount
 		findbitlockerdevices(@blmtpts) if defined $blmtpts[0];
 		mountvera(@vlist) if defined $vlist[0];
+
 	} # end if $opt_m
 	# all mounted, so exit
 	exit 0;

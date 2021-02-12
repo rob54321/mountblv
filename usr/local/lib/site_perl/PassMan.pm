@@ -47,7 +47,8 @@ sub new {
 	}
 	
 	# create cipher to check pass word
-	$cipher = new Crypt::CBC(-key    => $key,
+	$cipher = new Crypt::CBC(-pbkdf  => 'pbkdf2',
+				          -key    => $key,
 						-cipher => 'Blowfish');
 						
 	return bless {}, $class;
