@@ -12,7 +12,7 @@ my $passman;
 my $dataman;
 
 # the version
-my $version = "2.14";
+my $version = "2.15";
 
 # read fstab into array to check for disk mounts in fstab
 # only used in mountveracontainer
@@ -66,7 +66,7 @@ sub umountveracontainer {
 		#check if umount was successfull
 		if ($rc == 0) {
 			rmdir "$vmtpt";
-			printf "%-40s\t\t %s\n", "unmounted $verafile", "$vmtpt";		
+			printf "%-40s\t\t %s\n", "unmounted $verafile", "$vmtpt";
 
 			# delete this entry in hash %vmounts so it is up to date
 			delete $vmounts{$dlabel}->{$verafile};
