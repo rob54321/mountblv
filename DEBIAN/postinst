@@ -4,3 +4,7 @@
 # cpanm will only install if module is not preset.
 # also an updated module will be installed
 cpanm Crypt::CBC Crypt::Blowfish Crypt::Digest
+
+# change ownership of the resource files to robert.robert
+chown robert.robert /home/robert/.mbl.rc
+chown robert.robert /home/robert/.mbldata.rc
