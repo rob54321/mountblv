@@ -6,3 +6,16 @@ v:rootfs:/:/home/robert/v4/vera:/mnt/verah3
 v:rootfs:/:/home/robert/v2/v3/vera:/mnt/verah4
 v:rootfs:/:/home/robert/v2/v3/v4/vera:/mnt/verah5
 v:trans:/mnt/trans:/mnt/trans/v4/vera:/mnt/veratrans4
+v:ad64:/mnt/ad64:/mnt/ad64/vera:/mnt/veraad64
+v:ad64:/mnt/ad64:/mnt/ad64/backups/vera:/mnt/veraad641
+v:ad64:/mnt/ad64:/mnt/ad64/v2/vera:/mnt/veraad642
+v:ad64:/mnt/ad64:/mnt/ad64/v3/vera:/mnt/veraad643
+v:ad64:/mnt/ad64:/mnt/ad64/v4/vera:/mnt/veraad644
+v:ad64:/mnt/ad64:/mnt/ad64/v5/vera:/mnt/veraad645
+v:ad64:/mnt/ad64:/mnt/ad64/v6/vera:/mnt/veraad646
+v:trans:/mnt/trans:/mnt/trans/vera:/mnt/veratrans
+v:trans:/mnt/trans:/mnt/trans/backups/vera:/mnt/veratrans1
+v:trans:/mnt/trans:/mnt/trans/v2/vera:/mnt/veratrans2
+v:trans:/mnt/trans:/mnt/trans/v3/vera:/mnt/veratrans3
+v:trans:/mnt/trans:/mnt/trans/v4/v2/vera:/mnt/veratrans42
+v:trans:/mnt/trans:/mnt/trans/v4/v3/vera:/mnt/veratrans43

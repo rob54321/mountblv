@@ -40,6 +40,8 @@ my $vfref;
 # if there are addtional bitlocker and/or vera files in /root/.mbldata.rc, they are loaded as well
 # the constructor takes two parameters
 # DataMan(\%bitlockerdevs, \%veradevs)
+# %bitlockerdevs = (part_uuid => [disk_mtpt, disk_label])
+#%veradevs = (disk_label => [disk_mtpt, {verafile => veramtpt}])
 sub new {
 	my $class = shift;
 	$blref = shift;
@@ -64,25 +66,11 @@ sub new {
 		 hd3    => ['/mnt/hd3',  {'/mnt/hd3/backups/lynn/vera'   => '/mnt/verahd3'}]	,
 		 hd2    => ['/mnt/hd2',  {'/mnt/hd2/backups/lynn/vera'   => '/mnt/verahd2'}]	,
 		 hdint  => ['/mnt/hdint',{'/mnt/hdint/backups/lynn/vera' => '/mnt/verahdint'}]	,
-		 ad64   => ['/mnt/ad64', {'/mnt/ad64/vera'               => '/mnt/veraad64'	,
-							 '/mnt/ad64/backups/vera'       => '/mnt/veraad641'	,
-				          	 '/mnt/ad64/v2/vera'            => '/mnt/veraad642'	,
-				          	 '/mnt/ad64/v3/vera'            => '/mnt/veraad643'	,
-				            	 '/mnt/ad64/v4/vera'            => '/mnt/veraad644'	,
-				          	 '/mnt/ad64/v5/vera'            => '/mnt/veraad645'	,
-				          	 '/mnt/ad64/v6/vera'            => '/mnt/veraad646'}]	,
 		 win    => ['/mnt/win',  {'/mnt/win/lynn/vera'           => '/mnt/verawin'}]	,
-		 tosh   => ['/mnt/tosh', {'/mnt/tosh/backups/lynn/vera'  => '/mnt/veratosh'}]	,
-		 trans  => ['/mnt/trans',{'/mnt/trans/vera'              => '/mnt/veratrans'	,
-	          				 '/mnt/trans/backups/vera'      => '/mnt/veratrans1'	,
-				                '/mnt/trans/v2/vera'           => '/mnt/veratrans2'	,
-					           '/mnt/trans/v3/vera'     	  => '/mnt/veratrans3'	,
-					           '/mnt/trans/v4/v2/vera'        => '/mnt/veratrans42'	,
-					           '/mnt/trans/v4/v3/vera'        => '/mnt/veratrans43'}]	,
-		 can    => ['/mnt/can',  {'/mnt/can/backups/lynn/vera'   => '/mnt/veracan'}]);
+		 can    => ['/mnt/can',  {'/mnt/can/backups/lynn/vera'   => '/mnt/veracan'}]    ,
+		 tosh   => ['/mnt/tosh', {'/mnt/tosh/backups/lynn/vera'  => '/mnt/veratosh'}]);
 
 	# if the resource file exists, open and read it
-	# else create a default one
 	if (open DATA, "<", $rcfile) {
 		# get line
 		while (my $line = <DATA>) {
