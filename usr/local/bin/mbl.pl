@@ -712,7 +712,15 @@ defaultparameter();
 #print "after:  @ARGV\n";
 
 # get command line options
-getopts('lm:u:hVd:c:');
+# a -- data manager
+# l -- list mounted devices
+# m list|nothing -- mount devices
+# u list|nothing -- un mount devices
+# h -- help
+# V -- version, exit
+# d list|nothing -- delete password(s)
+# c list|nothing -- change password(s)
+getopts('alm:u:hVd:c:');
 
 # usage for -h or no command line parameters
 if ($opt_h or $no == 0) {
@@ -729,19 +737,30 @@ if ($opt_h or $no == 0) {
 	exit 0;
 }
 
-# populate the default values for bitlocker and vera  devices
-$dataman = DataMan->new(\%allbldev, \%vdevice);
-
 # to get the version no
 if ($opt_V) {
 	print "Version $version\n";
 	exit 0;
 }
 
+# populate the default values for bitlocker and vera  devices
+$dataman = DataMan->new(\%allbldev, \%vdevice);
+
 # create PassMan if -d, -c or -m given
 # create PassManger
 $passman = PassMan->new() if $opt_d or $opt_c or $opt_m;
-	
+
+# Data Manager to add delete or edit entries in the .mbldata.rc file
+# -a -- to enter data manager
+# -l -- list file	
+# -b -- add bitlocker prompt for entries
+# -v -- add vera file prompt for entries
+# -d verafile|veramtpt|vdisk|bitlockerlabel|bitlockermtpt
+# -q -- quit
+if ($opt_a) {
+	# data maintenance
+	$dataman->menu();
+}
 
 # delete password or delete all passwords
 # the parameter can be all, if no command line parameters are passed

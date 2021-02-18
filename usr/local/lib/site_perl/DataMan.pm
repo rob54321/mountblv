@@ -54,10 +54,7 @@ sub new {
 	# the key is the partuuid
 	# hash format  for each record: partuuid => [mountpoint disk_label]
 	# if mount point is not given then /mnt/drive1, /mnt/drive2, etc will be used
-	%{$blref} = ("7150343d-01" => [qw(/mnt/axiz axiz)],
-				"7f8f684f-78e2-4903-903a-c5d9ab8f36ee" => [qw(/mnt/drivec drivec)],
-				"766349ae-03" => [qw(/mnt/ddd ddd)],
-		       	"78787878-01" => [qw(/mnt/ver4 ver4)]);
+	%{$blref} = ("7f8f684f-78e2-4903-903a-c5d9ab8f36ee" => [qw(/mnt/drivec drivec)]);
 
 	# the hash vdevice contains 
 	# partition label => [drive mountpoint, {verafile => verafile_mountpoint}]
@@ -133,4 +130,88 @@ sub new {
 	return bless {}, $class;
 }
 
+sub menu {
+	my $self = shift;
+	
+	# show DataMan menu and get options
+	my $exit = "false";
+	while ($exit eq "false") {
+		# show menu
+		print "\nenter: (a) add (d) delete (e) edit (l) list (q) quit\n";
+		my $entry = <STDIN>;
+		chomp($entry);
+		if ($entry eq "q") {
+			# quit
+			$exit = "true";
+		} elsif ($entry eq "a") {
+			# add and entry
+			$self->add();
+		} elsif ($entry eq "d") {
+			# delete
+			print "deleting\n";
+		} elsif ($entry eq "l") {
+			# list file
+			system("cat $rcfile");
+			print "\n";
+		} elsif ($entry eq "e") {
+			# edit file
+			print "editing\n";
+		} else {
+			# unknown entry
+			print "unknown entry\n";
+		}
+	} # end while exit
+}
+
+# this sub takes no parameters
+# it displays the input format, accepts input, checks for duplicates,
+# checks to see if input is malformed, formats the input and writes it to the rcfile.
+# an error message is printed if a duplicate is entered
+sub add {
+	# read .mbldata.rc into a list
+	# much easier to check
+	open MBLDATA, "<", "$rcfile";
+	my @mbldata = <MBLDATA>;
+	close MBLDATA;
+	chomp @mbldata;
+	
+	print "\nfor vera enter: v disk_label disk_mtpt vera_file vera_mtpt\n";
+	print "for bit locker: b part_uuid disk_mtpt disk_label\n\n";
+	my $vinput = <STDIN>;
+	chomp($vinput);
+	my @entry = split /\s+/,$vinput;
+
+	# first check the validity of the input
+	# then check for duplicate entries
+	#check input: 5 items for vera, 4 items for bitlocker
+	if (($entry[0] eq 'v' and @entry == 5) or ($entry[0] eq 'b' and @entry == 4)) {
+		# check each line of mbldata for a duplicate vera file
+		# or a duplicate bitlocker mount point
+		# for vera:      $entry[3] = verafile
+		# for bitlocker: $entry[2] = disk mount point
+		my $dupentry = "false";
+		foreach my $line (@mbldata) {
+			if ((($line =~ /^v/) and ($line =~ /:$entry[3]:/))
+			      or (($line =~ /^b/) and ($line =~ /:$entry[2]:/))) {
+				# duplicate entry found
+				print "\n$vinput is a duplicate entry\n\n";
+				$dupentry = "true";
+				last;
+			}
+		} # end foreach $line
+
+		# append entry if it is not duplicated
+		if ($dupentry eq "false") {
+			# entry not a duplicate
+			# format and append entry
+			$vinput =~ s/\s+/:/g;
+			print "adding: $vinput\n";
+			open MBLDATA, ">>","$rcfile";
+			print MBLDATA "$vinput\n";
+			close MBLDATA;
+		}
+	} else {
+		print "Entry malformed\n";
+	}
+}
 1;
