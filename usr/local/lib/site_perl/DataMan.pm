@@ -1,4 +1,6 @@
 package DataMan;
+
+use Term::ReadKey;
 use strict;
 use warnings;
 
@@ -67,9 +69,9 @@ sub new {
 		 can    => ['/mnt/can',  {'/mnt/can/backups/lynn/vera'   => '/mnt/veracan'}]);
 
 	# if the resource file exists, open and read it
-	if (open DATA, "<", $rcfile) {
+	if (open MBLDATA, "<", $rcfile) {
 		# get line
-		while (my $line = <DATA>) {
+		while (my $line = <MBLDATA>) {
 			# check if line is a bitlocker or vera file
 			chomp($line);
 			my @record = split /:/,$line;
@@ -113,7 +115,7 @@ sub new {
 				
 			} # end if else record eq b
 		} # end while
-		close DATA;
+		close MBLDATA;
 	} # end if open
 	####################################
 	# testing #
@@ -148,7 +150,7 @@ sub menu {
 			$self->add();
 		} elsif ($entry eq "d") {
 			# delete
-			print "deleting\n";
+			$self->delentry();
 		} elsif ($entry eq "l") {
 			# list file
 			system("cat $rcfile");
@@ -212,6 +214,63 @@ sub add {
 		}
 	} else {
 		print "Entry malformed\n";
+	}
+}
+
+# sub to delete entries in .mbldata.rc
+# if a disk label is entered all those entries are deleted
+sub delentry {
+	# read data the file into an array
+	# for easier matching
+	open MBLDATA, "<", "$rcfile";
+	my @mbldata = <MBLDATA>;
+	chomp (@mbldata);
+	close MBLDATA;
+
+	print "\nEnter one or more of: mtpt|disk label|vera file|part_uuid\n";
+	my $linput = <STDIN>;
+	chomp($linput);
+	my @input = split /\s+/, $linput;
+
+	# no of items to delete, lines
+	my $count = 0;
+
+	#count how many lines match
+	# display which lines will be deleted
+	# make a list of lines to be deleted
+	my @linestodel = ();
+
+	foreach my $line (@mbldata) {
+		foreach my $item (@input) {
+			# each entry could be begining, middle or end of line
+			# eg: v:trans:/mnt/trans:/mnt/trans/vera:/mnt/veratrans
+			if ($line =~ /:$item:|:$item$|^$item:/) {
+				$count++;
+				push @linestodel, $line;
+				print "$line\n";
+			}
+		}
+	}
+
+	print "\nDelete the above $count line(s)?(n/y)";
+	ReadMode 4;
+	my $input;
+	while (not defined ($input = ReadKey(-1))) {}
+
+	ReadMode 0;
+	
+	if ($input =~ /y|Y/) {
+		# delete the lines
+		# write mbldata list to file, excluding the lines to be deleted
+		unlink $rcfile;
+		open MBLDATA, ">>", "$rcfile";
+		foreach my $line (@mbldata) {
+			print MBLDATA "$line\n" unless grep /^$line$/, @linestodel;
+		}
+		close MBLDATA;
+		print "\ndeleted\n";
+	} else {
+		print "\naborted\n";
 	}
 }
 1;

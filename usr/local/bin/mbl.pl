@@ -12,7 +12,7 @@ my $passman;
 my $dataman;
 
 # the version
-my $version = "2.17";
+my $version = "2.18";
 
 # read fstab into array to check for disk mounts in fstab
 # only used in mountveracontainer
@@ -746,10 +746,6 @@ if ($opt_V) {
 # populate the default values for bitlocker and vera  devices
 $dataman = DataMan->new(\%allbldev, \%vdevice);
 
-# create PassMan if -d, -c or -m given
-# create PassManger
-$passman = PassMan->new() if $opt_d or $opt_c or $opt_m;
-
 # Data Manager to add delete or edit entries in the .mbldata.rc file
 # -a -- to enter data manager
 # -l -- list file	
@@ -760,7 +756,12 @@ $passman = PassMan->new() if $opt_d or $opt_c or $opt_m;
 if ($opt_a) {
 	# data maintenance
 	$dataman->menu();
+	exit(0);
 }
+
+# create PassMan if -d, -c or -m given
+# create PassManger
+$passman = PassMan->new() if $opt_d or $opt_c or $opt_m;
 
 # delete password or delete all passwords
 # the parameter can be all, if no command line parameters are passed
