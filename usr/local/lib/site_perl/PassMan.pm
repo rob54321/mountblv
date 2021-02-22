@@ -6,11 +6,12 @@ package PassMan;
 # getpwd will prompt for the password if not found in mbl.rc. It will then append the encrypted password
 # delpwd(verafile) deletes a password.
 
-use strict;
-use warnings;
 use Crypt::Blowfish;
 use Crypt::CBC;
 use Crypt::Digest;
+user Term::ReadKey;
+use strict;
+use warnings;
 
 # cipher
 my $cipher;
