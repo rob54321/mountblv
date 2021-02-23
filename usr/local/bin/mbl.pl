@@ -32,9 +32,9 @@ my %vdevice = ();
 our ($opt_d, $opt_c, $opt_l, $opt_m, $opt_h, $opt_v, $opt_u, $opt_V, $opt_a);
 
 # each (key,value) of %vmounts is dlabel => {vfile => vmtpt}
-my %vmounts = ();     # %vmounts = (dlabel => {vfile => vmtpt})
-my @vdiskmounts = (); # @vdiskmounts = (dmtpt1, dmtpt2,..)
-my %blmounts = ();    # %blmounts = (dmtpt => [dlabel, encmountpt])
+my %vmounts = ();     # vera disks mounted by mbl.pl: %vmounts = (dlabel => {vfile => vmtpt})
+my @vdiskmounts = (); # vera disks mounted by mbl.pl: @vdiskmounts = (dmtpt1, dmtpt2,..)
+my %blmounts = ();    # hash of mounted bit locker drives: %blmounts = (dmtpt => [dlabel, encmountpt])
 # declare global empty lists for the values
 # attachedveralabels contains a list of attached disk labels with vera containers on them
 my @attachedveralabels = ();
@@ -281,7 +281,7 @@ sub getdlabelfromvfile {
 
 # for bit locker file system
 # this sub makes a hash %attachedblmtpts
-# partuuid => device path
+# blmtpts => [device path, disk_label]
 # of all attached and known bitlocker drives
 # the call: attacheddevices();
 sub attachedbldevices {
@@ -777,7 +777,7 @@ if ($opt_d) {
 		# delete the .mbl.rc file
 		$passman->delpwd("all");
 	} else {
-		# get the hash of verafiles and bllabels for their password deletion
+		# get the hash of verafiles and bllabels from the input arguments for their password deletion
 		# %files = ("verafile" => [list of vera files],
 		#           "bllabel"  => [list of bitlocker labels],
 		#           "unknown"  => [list of unknown labels])
