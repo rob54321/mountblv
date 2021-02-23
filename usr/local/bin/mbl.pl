@@ -280,7 +280,9 @@ sub getdlabelfromvfile {
 }
 
 # for bit locker file system
-# this sub makes a hash partuuid => device path of all known bitlocker drives
+# this sub makes a hash %attachedblmtpts
+# partuuid => device path
+# of all attached and known bitlocker drives
 # the call: attacheddevices();
 sub attachedbldevices {
 
@@ -776,6 +778,9 @@ if ($opt_d) {
 		$passman->delpwd("all");
 	} else {
 		# get the hash of verafiles and bllabels for their password deletion
+		# %files = ("verafile" => [list of vera files],
+		#           "bllabel"  => [list of bitlocker labels],
+		#           "unknown"  => [list of unknown labels])
 		my %files = ();
 		getvfilesandbllabels($opt_d, \%files);
 		
