@@ -627,9 +627,10 @@ sub findbitlockerdevices {
 
 # sub to get verafile(s) or bitlocker_labels from an input string
 # parameters passed: inputstring, ref to empty hash
-# vera file(s) and bllabels are returned in the hash
+# all known vera file(s) and bllabels are returned in the hash
 
 # the hash will be populated as follows:
+# these are known and may or may not be attached
 # verafile => [vfile1, vfile2, ...]
 # bllabel  => [bllabel1, bllabel2,...]
 # unknown  => [unknown1, unknown2, .....]
