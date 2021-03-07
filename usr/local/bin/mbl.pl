@@ -732,6 +732,7 @@ if ($opt_h or $no == 0) {
 	print "-m to mount all or list to mount [veralabel|vmtpt|verafile|blmtpt|bllabel]\n";
 	print "-u to umount everthing that was mounted or [veralabel|veramtpt|verfile|bitlocker_mtpt]\n";
 	print "-l list all mounted bitlocker drives and veracrypt containers\n";
+	print "-a Data management menu, add or delete vera files/bitlocker drives\n";
 	print "-d delete all passwords or list [veralabel|vmtpt|verafile|bllabel]\n";
 	print "-c change/set password of all vera devices/files or bitlocker drive or list [veralabel|veramtpt|verafile|bllabel]\n";
 	print "-h to get this help\n";
