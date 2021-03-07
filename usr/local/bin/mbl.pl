@@ -21,13 +21,13 @@ my @fstab = ();
 
 # for bitlocker drives
 # the key is the partuuid
-# hash format  for each record: partuuid => [mountpoint disk_label]
+# hash format  for each record: partuuid => [disk mountpoint, disk_label]
 # if mount point is not given then /mnt/drive1, /mnt/drive2, etc will be used
-my %allbldev = ();
+my $allbldevref;
 
 # the hash vdevice contains 
 # partition label => [drive mountpoint, {verafile => verafile_mountpoint}]
-my %vdevice = ();
+my %vdevice;
 
 our ($opt_d, $opt_c, $opt_l, $opt_m, $opt_h, $opt_v, $opt_u, $opt_V, $opt_a);
 
@@ -43,7 +43,7 @@ my @attachedveramtpts = ();
 
 
 # attachedblmtpts: blmtpts => [device, disk_label]
-# devices are attached, and known to allbldev
+# devices are attached, and known to allbldevref
 my %attachedblmtpts = ();
 
 
@@ -132,13 +132,13 @@ sub listmounteddev {
 	}
 
 	# make a list of bit locker drives that are mounted in blmounts{dmtpt} = [dlabel, encmountpoint]
-	foreach my $partuuid (keys(%allbldev)) {
+	foreach my $partuuid (keys(%{$allbldevref})) {
 		# check if the dmtpt is mounted
-		my $dmtpt = $allbldev{$partuuid}->[0];
+		my $dmtpt = $allbldevref->{$partuuid}->[0];
 		my $rc = system("findmnt -l --all $dmtpt > /dev/null 2>&1");
  		if ($rc == 0) {
  			# drive is mounted
-			my $dlabel = $allbldev{$partuuid}->[1];
+			my $dlabel = $allbldevref->{$partuuid}->[1];
 			my $bdefile = $dmtpt . "enc";
 			# %blmounts = (dmtpt => [dlabel, bdefile])
 			$blmounts{$dmtpt} = [$dlabel, $bdefile];
@@ -297,13 +297,13 @@ sub attachedbldevices {
 		# only add to the hash for fstype = BitLocker
 		if ($fstype and ($fstype eq "BitLocker")) {
 
-			# if bitlocker device is not in allbldev, do not include it in the hash
+			# if bitlocker device is not in allbldevref, do not include it in the hash
 			# of attached bit locker devices
-			if ($partuuid and exists $allbldev{$partuuid}) {
+			if ($partuuid and exists $allbldevref->{$partuuid}) {
 
 				# attachedblmtps: blmtpts => [device, disk_label]
-				$attachedblmtpts{$allbldev{$partuuid}->[0]} = [$device,
-										$allbldev{$partuuid}->[1]];
+				$attachedblmtpts{$allbldevref->{$partuuid}->[0]} = [$device,
+										$allbldevref->{$partuuid}->[1]];
 			} else {
 				# partuuid does not exist in hash
 				print "unknown BitLocker drive $device\n";
@@ -625,91 +625,6 @@ sub findbitlockerdevices {
 	print "\n";
 }
 
-# sub to get verafile(s) or bitlocker_labels from an input string
-# parameters passed: inputstring, ref to empty hash
-# all known vera file(s) and bllabels are returned in the hash
-
-# the hash will be populated as follows:
-# these are known and may or may not be attached
-# verafile => [vfile1, vfile2, ...]
-# bllabel  => [bllabel1, bllabel2,...]
-# unknown  => [unknown1, unknown2, .....]
-
-# returns ref to empty hash if nothing found
-# returns a list containing the verafile or bitlocker_dlabel or a list of verafiles
-# if a vera_dlabel was passed.
-# if inputstring is all the full lists of verafiles and bllabels are returned in the hash
-sub getvfilesandbllabels {
-	my $inputstring = shift;
-	my $href = shift; # ref to empty hash
-	my @args = split /\s+/, $inputstring;
-		
-	# make a lists of all vera files, vera mtpts, bitlocker_dlabels and bitlocker_mtpts
-	my @verafiles = ();
-	my @veramtpts = ();
-	my @bldlabels = ();
-	my @blmtpts = ();
-	
-	# make a list of all known vera files and mtpts
-	foreach my $dlabel (keys(%vdevice)) {
-		push @verafiles, keys(%{$vdevice{$dlabel}->[1]});
-		push @veramtpts, values(%{$vdevice{$dlabel}->[1]});
-	}
-	# make lists for bitlocker_dlabels and bitlocker_mtpts
-	foreach my $partuuid (keys(%allbldev)) {
-		push @blmtpts, $allbldev{$partuuid}->[0];
-		push @bldlabels, $allbldev{$partuuid}->[1];
-	}
-
-	# if the input string is "all"
-	if ($inputstring eq "all") {
-		$href->{"verafile"} = \@verafiles;
-		$href->{"bllabel"} = \@bldlabels;
-	} else {	
-		# the hash must be made up of verafile(s) or bllabel(s) with the appropriate key
-		my @vfiles = ();
-		my @bllabels = ();
-		my @unknown = ();
-		foreach my $arg (@args) {
-			if ($vdevice{$arg}) {
-				# item is a vera disk label
-				# add all vera files for the label
-				push @vfiles, keys(%{$vdevice{$arg}->[1]});
-				
-			} elsif (grep /^$arg$/, @verafiles) {
-				# if item is a vera file
-				push @vfiles, $arg;
-				
-			} elsif (grep /^$arg$/, @veramtpts) {
-				# item is a vera mtpt, find verafile
-				foreach my $dlabel (keys(%vdevice)) {
-					foreach my $vfile (keys(%{$vdevice{$dlabel}->[1]})) {
-						# add vera file for the particular mtpt to the delet list
-						push @vfiles, $vfile if $vdevice{$dlabel}->[1]->{$vfile} eq $arg;
-					}
-				}
-				
-			} elsif (grep /^$arg$/, @bldlabels) {
-				# item is a bitlocker disk label
-				push @bllabels, $arg;
-				
-			} elsif (grep /^$arg$/, @blmtpts) {
-				# item is a bitlocker mount point
-				# find the disk label
-				foreach my $partuuid (keys(%allbldev)) {
-					push @bllabels, $allbldev{$partuuid}->[1] if $allbldev{$partuuid}->[0] eq $arg;
-				}
-				
-			} else {
-				# unknown arg
-				push @unknown, $arg;
-			}
-		} # end foreach $arg
-		$href->{"verafile"} = \@vfiles;
-		$href->{"bllabel"} = \@bllabels;
-		$href->{"unknown"} = \@unknown;
-	} # end if inputstring
-}
 ############################
 # main entry point
 ############################
@@ -750,7 +665,7 @@ if ($opt_V) {
 }
 
 # populate the default values for bitlocker and vera  devices
-$dataman = DataMan->new(\%allbldev, \%vdevice);
+($dataman, $allbldevref, $vdeviceref) = DataMan->new();
 
 # Data Manager to add delete or edit entries in the .mbldata.rc file
 # -a -- to enter data manager

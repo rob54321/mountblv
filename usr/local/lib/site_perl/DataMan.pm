@@ -34,8 +34,8 @@ use warnings;
 my $rcfile = "$ENV{'HOME'}/.mbldata.rc";
 
 # class variables
-my $blref;
-my $vfref;
+my %allbldev = ();
+my %vdevice = ();
 
 # constructor.
 # loads the default values for bitlocker and vera files.
@@ -46,8 +46,6 @@ my $vfref;
 #%veradevs = (disk_label => [disk_mtpt, {verafile => veramtpt}])
 sub new {
 	my $class = shift;
-	$blref = shift;
-	$vfref = shift;
 	
 	##########################################################
 	# default values for bitlocker and vera files
@@ -56,11 +54,11 @@ sub new {
 	# the key is the partuuid
 	# hash format  for each record: partuuid => [mountpoint disk_label]
 	# if mount point is not given then /mnt/drive1, /mnt/drive2, etc will be used
-	%{$blref} = ("7f8f684f-78e2-4903-903a-c5d9ab8f36ee" => [qw(/mnt/drivec drivec)]);
+	%allbldev = ("7f8f684f-78e2-4903-903a-c5d9ab8f36ee" => [qw(/mnt/drivec drivec)]);
 
 	# the hash vdevice contains 
 	# partition label => [drive mountpoint, {verafile => verafile_mountpoint}]
-	%{$vfref} = ( 
+	%vdevice = ( 
 		 ssd    => ['/mnt/ssd',  {'/mnt/ssd/vera'                => '/mnt/verassd'}]	,
 		 hd3    => ['/mnt/hd3',  {'/mnt/hd3/backups/lynn/vera'   => '/mnt/verahd3'}]	,
 		 hd2    => ['/mnt/hd2',  {'/mnt/hd2/backups/lynn/vera'   => '/mnt/verahd2'}]	,
@@ -82,7 +80,7 @@ sub new {
 				# for bitlocker drive:
 				# b:partuuid:mount point:partition label
 				#
-				$blref->{$record[1]} = [$record[2], $record[3]];
+				$allbldev->{$record[1]} = [$record[2], $record[3]];
 			} elsif ($record[0] eq "v") {
 				# the record is a vera file
 				# %vdevice{partition_label} = [drive mountpoint, {verafile => vera_mountpoint}]
@@ -272,5 +270,91 @@ sub delentry {
 	} else {
 		print "\naborted\n";
 	}
+}
+# sub to get verafile(s) or bitlocker_labels from an input string
+# parameters passed: inputstring, ref to empty hash
+# all known vera file(s) and bllabels are returned in the hash
+
+# the hash will be populated as follows:
+# these are known and may or may not be attached
+# verafile => [vfile1, vfile2, ...]
+# bllabel  => [bllabel1, bllabel2,...]
+# unknown  => [unknown1, unknown2, .....]
+
+# returns ref to empty hash if nothing found
+# returns a list containing the verafile or bitlocker_dlabel or a list of verafiles
+# if a vera_dlabel was passed.
+# if inputstring is all the full lists of verafiles and bllabels are returned in the hash
+sub getvfilesandbllabels {
+	my $self = shift;
+	my $inputstring = shift;
+	my $href = shift; # ref to empty hash
+	my @args = split /\s+/, $inputstring;
+		
+	# make a lists of all known vera files, vera mtpts, bitlocker_dlabels and bitlocker_mtpts
+	my @verafiles = ();
+	my @veramtpts = ();
+	my @bldlabels = ();
+	my @blmtpts = ();
+	
+	# make a list of all known vera files and mtpts
+	foreach my $dlabel (keys(%vdevice)) {
+		push @verafiles, keys(%{$vdevice{$dlabel}->[1]});
+		push @veramtpts, values(%{$vdevice{$dlabel}->[1]});
+	}
+	# make lists of all known bitlocker_dlabels and bitlocker_mtpts
+	foreach my $partuuid (keys(%allbldev)) {
+		push @blmtpts, $allbldev{$partuuid}->[0];
+		push @bldlabels, $allbldev{$partuuid}->[1];
+	}
+
+	# if the input string is "all"
+	if ($inputstring eq "all") {
+		$href->{"verafile"} = \@verafiles;
+		$href->{"bllabel"} = \@bldlabels;
+	} else {	
+		# the hash must be made up of verafile(s) or bllabel(s) with the appropriate key
+		my @vfiles = ();
+		my @bllabels = ();
+		my @unknown = ();
+		foreach my $arg (@args) {
+			if ($vdevice{$arg}) {
+				# item is a vera disk label
+				# add all vera files for the label
+				push @vfiles, keys(%{$vdevice{$arg}->[1]});
+				
+			} elsif (grep /^$arg$/, @verafiles) {
+				# if item is a vera file
+				push @vfiles, $arg;
+				
+			} elsif (grep /^$arg$/, @veramtpts) {
+				# item is a vera mtpt, find verafile
+				foreach my $dlabel (keys(%vdevice)) {
+					foreach my $vfile (keys(%{$vdevice{$dlabel}->[1]})) {
+						# add vera file for the particular mtpt to the delet list
+						push @vfiles, $vfile if $vdevice{$dlabel}->[1]->{$vfile} eq $arg;
+					}
+				}
+				
+			} elsif (grep /^$arg$/, @bldlabels) {
+				# item is a bitlocker disk label
+				push @bllabels, $arg;
+				
+			} elsif (grep /^$arg$/, @blmtpts) {
+				# item is a bitlocker mount point
+				# find the disk label
+				foreach my $partuuid (keys(%allbldev)) {
+					push @bllabels, $allbldev{$partuuid}->[1] if $allbldev{$partuuid}->[0] eq $arg;
+				}
+				
+			} else {
+				# unknown arg
+				push @unknown, $arg;
+			}
+		} # end foreach $arg
+		$href->{"verafile"} = \@vfiles;
+		$href->{"bllabel"} = \@bllabels;
+		$href->{"unknown"} = \@unknown;
+	} # end if inputstring
 }
 1;
