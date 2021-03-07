@@ -34,7 +34,10 @@ use warnings;
 my $rcfile = "$ENV{'HOME'}/.mbldata.rc";
 
 # class variables
+# %allbldev = (part_uuid => [dmtpt, dlabel])
 my %allbldev = ();
+
+# %vdevice = (dlabel => [dmtpt, {vfile => vmtpt}])
 my %vdevice = ();
 
 # constructor.
