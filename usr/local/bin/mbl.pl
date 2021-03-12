@@ -27,7 +27,7 @@ my $allbldevref;
 
 # the hash vdevice contains 
 # partition label => [drive mountpoint, {verafile => verafile_mountpoint}]
-my %vdevice;
+my $vdeviceref;
 
 our ($opt_d, $opt_c, $opt_l, $opt_m, $opt_h, $opt_v, $opt_u, $opt_V, $opt_a);
 
@@ -73,7 +73,7 @@ sub umountveracontainer {
 			# check if disk with vera container should be unmounted
 
 			if (! keys(%{$vmounts{$dlabel}})) {
-				my $dmtpt = $vdevice{$dlabel}->[0];
+				my $dmtpt = $vdeviceref->{$dlabel}->[0];
 				if (grep /^$dmtpt$/, @vdiskmounts) {
 					my $rc = system("sudo umount $dmtpt");
 					# check if un mounted
@@ -115,7 +115,7 @@ sub listmounteddev {
 			# get disk label of vera file
 			my $dlabel = getdlabelfromvfile($verafile);
 			# get disk mount point
-			my $dmtpt = $vdevice{$dlabel}->[0];
+			my $dmtpt = $vdeviceref->{$dlabel}->[0];
 			$vmounts{$dlabel}->{$verafile} = $veramtpt;
 		}
 	}
@@ -215,13 +215,13 @@ sub umount {
 				# un mount if not mounted
 				my $dlabel = getdlabelfromvfile($arg);
 				# must use vdevice instead of vmounts because verafile may have been umounted
-				my $vmtpt = $vdevice{$dlabel}->[1]->{$arg};
+				my $vmtpt = $vdeviceref->{$dlabel}->[1]->{$arg};
 				umountveracontainer($vmtpt);
 
-			} elsif (exists $vdevice{$arg}) {
+			} elsif (exists $vdeviceref->{$arg}) {
 				# arg is a vera disk label. umount all vera containers associated with the label
-				foreach my $verafile (keys(%{$vdevice{$arg}->[1]})) {
-					my $vmtpt = $vdevice{$arg}->[1]->{$verafile};
+				foreach my $verafile (keys(%{$vdeviceref->{$arg}->[1]})) {
+					my $vmtpt = $vdeviceref->{$arg}->[1]->{$verafile};
 					umountveracontainer($vmtpt);
 				} # end of foreach
 
@@ -255,8 +255,8 @@ sub getlabelvfilefromvmtpt {
 
 	# search all attached labels for the the vera mountpoint
 	foreach my $label (@attachedveralabels) {
-		foreach my $verafile (keys(%{$vdevice{$label}->[1]})) {
-			return ($label, $verafile) if $veramtpt eq $vdevice{$label}->[1]->{$verafile};
+		foreach my $verafile (keys(%{$vdeviceref->{$label}->[1]})) {
+			return ($label, $verafile) if $veramtpt eq $vdeviceref->{$label}->[1]->{$verafile};
 		}
 	}
 	# either label or verafile not found
@@ -271,7 +271,7 @@ sub getdlabelfromvfile {
 
 	# search all attached labels of vera disks
 	foreach my $label (@attachedveralabels) {
-		foreach my $key (keys(%{$vdevice{$label}->[1]})) {
+		foreach my $key (keys(%{$vdeviceref->{$label}->[1]})) {
 			return $label if $key eq $verafile;
 		}
 	}
@@ -373,8 +373,8 @@ sub mountveracontainer {
 	my $verafile = shift;
 
 	# get vera mountpoint
-	my $veramtpt = $vdevice{$dlabel}->[1]->{$verafile};
-	my $dmtpt = $vdevice{$dlabel}->[0];
+	my $veramtpt = $vdeviceref->{$dlabel}->[1]->{$verafile};
+	my $dmtpt = $vdeviceref->{$dlabel}->[0];
 
 	# mount disk if necessary
 	my $rc = system("findmnt -l --all $dmtpt > /dev/null 2>&1");
@@ -456,17 +456,17 @@ sub makeattachedveralists {
 	my @vlist = `lsblk -o LABEL`;
 	foreach my $label (@vlist) {
 		chomp($label);
-		if ($label and exists $vdevice{$label}) {
+		if ($label and exists $vdeviceref->{$label}) {
 			push @attachedveralabels, $label;
 		}
 	}
 
 	# for each attached disk label make a list of vera files and vera mountpoints
 	foreach my $label (@attachedveralabels) {
-		my @vfilelist = keys(%{$vdevice{$label}->[1]});
+		my @vfilelist = keys(%{$vdeviceref->{$label}->[1]});
 		push @attachedverafiles, @vfilelist;
 
-		foreach my $vmtpt (values(%{$vdevice{$label}->[1]})) {
+		foreach my $vmtpt (values(%{$vdeviceref->{$label}->[1]})) {
 			push @attachedveramtpts, $vmtpt;
 		}
 	}
@@ -502,7 +502,7 @@ sub mountvera {
 		foreach my $label (@attachedveralabels) {
 			print "\n";
 			# for each label there could be multiple vera containers
-			foreach my $verafile (keys(%{$vdevice{$label}->[1]})) {
+			foreach my $verafile (keys(%{$vdeviceref->{$label}->[1]})) {
 				mountveracontainer($label, $verafile);
 			}
 		}
@@ -515,7 +515,7 @@ sub mountvera {
 				# argument is a disk label
 				# mount all vera files on disk label
 				print "\n";
-				foreach my $verafile (keys(%{$vdevice{$arg}->[1]})) {
+				foreach my $verafile (keys(%{$vdeviceref->{$arg}->[1]})) {
 					# mount vera file
 					#print "arg is a label = $arg: verafile = $verafile\n";
 					mountveracontainer($arg, $verafile);
@@ -666,7 +666,9 @@ if ($opt_V) {
 }
 
 # populate the default values for bitlocker and vera  devices
-($dataman, $allbldevref, $vdeviceref) = DataMan->new();
+$dataman = DataMan->new();
+$allbldevref = $dataman->[0];
+$vdeviceref = $dataman->[1];
 
 # Data Manager to add delete or edit entries in the .mbldata.rc file
 # -a -- to enter data manager
@@ -699,7 +701,7 @@ if ($opt_d) {
 		#           "bllabel"  => [list of bitlocker labels],
 		#           "unknown"  => [list of unknown labels])
 		my %files = ();
-		getvfilesandbllabels($opt_d, \%files);
+		$dataman->getvfilesandbllabels($opt_d, \%files);
 		
 		# delete verafile passwords
 		for (my $i = 0; $i < @{$files{verafile}}; $i++) {
@@ -734,7 +736,7 @@ if ($opt_c) {
 
 	# required to determine if the disk containing the vera file is available for mounting
 	makeattachedveralists();
-	getvfilesandbllabels($opt_c, \%files);
+	$dataman->getvfilesandbllabels($opt_c, \%files);
 
 	# change the passwords for bitlocker devices
 	for (my $i = 0; $i < @{$files{"bllabel"}}; $i++) {
@@ -761,7 +763,7 @@ if ($opt_c) {
 			print "\n";
 		} else {
 			# check if vera disk containing vera file is mounted			
-			my $dmtpt = $vdevice{$dlabel}->[0];
+			my $dmtpt = $vdeviceref->{$dlabel}->[0];
 			my $rc = system("findmnt -l --all $dmtpt > /dev/null 2>&1");
 			unless ($rc == 0) {
 				# disk containing vfile not mounted, mount it
@@ -829,7 +831,7 @@ if ($opt_l) {
 		# vdiskmounts has mountpoint of drive mounted by mbl
 		# %vdevice: partition label => [drive mountpoint, {verafile => verafile_mountpoint}]
 
-		my $dmtpt = $vdevice{$dlabel}->[0];
+		my $dmtpt = $vdeviceref->{$dlabel}->[0];
 		if (grep /^$dmtpt$/, @vdiskmounts) {
 			# disk containing vera containers was mounted by mbl
 			print "$dlabel: mounted by mbl.pl:\n";

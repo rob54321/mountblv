@@ -49,7 +49,7 @@ my %vdevice = ();
 #%veradevs = (disk_label => [disk_mtpt, {verafile => veramtpt}])
 sub new {
 	my $class = shift;
-	
+	my $self;
 	##########################################################
 	# default values for bitlocker and vera files
 	##########################################################
@@ -83,7 +83,7 @@ sub new {
 				# for bitlocker drive:
 				# b:partuuid:mount point:partition label
 				#
-				$allbldev->{$record[1]} = [$record[2], $record[3]];
+				$allbldev{$record[1]} = [$record[2], $record[3]];
 			} elsif ($record[0] eq "v") {
 				# the record is a vera file
 				# %vdevice{partition_label} = [drive mountpoint, {verafile => vera_mountpoint}]
@@ -93,44 +93,36 @@ sub new {
 				# if the key $record[1] (part label) exists in the hash,
 				# then the hash {verafile => vera_mountpoint }must be expanded instead.
 
-				if (exists($vfref->{$record[1]})) {
+				if (exists($vdevice{$record[1]})) {
 					# key exists, so elements must be added to {verafile => vera_mountpoint}
 					# check if the partition mount point is correct
-					if ($vfref->{$record[1]}[0] eq $record[2]) {
+					if ($vdevice{$record[1]}->[0] eq $record[2]) {
 						# part mount point correct, insert into inner hash
 						# record[3] = verafile
 						# record[4] = vera mountpoint
-						$vfref->{$record[1]}[1]->{$record[3]} = $record[4];
+						$vdevice{$record[1]}->[1]->{$record[3]} = $record[4];
 					} else {
 						# partition mount not the same
 						# error in data
 						print "error in $ENV{'HOME'}/.mbldata.rc for verafile $record[3]\n";
-						print "actual mtpt: $vfref->{$record[1]}[0] file mtpt: $record[2]\n";
+						print "actual mtpt: $vdevice{$record[1]}->[0] file mtpt: $record[2]\n";
 						print "\n";
 						sleep 1;
 					}
 				} else {
 					# key does not exist, a new key can be added
-					$vfref->{$record[1]} = [$record[2], {$record[3] => $record[4]}];
+					$vdevice{$record[1]} = [$record[2], {$record[3] => $record[4]}];
 				} # end if else exists
 				
 			} # end if else record eq b
 		} # end while
 		close MBLDATA;
 	} # end if open
-	####################################
-	# testing #
-	####################################
-	#foreach my $key (keys(%{$vfref})) {
-	#	foreach my $vfile (keys(  %{$vfref->{$key}[1]}  )) {
-	#		print "$key $vfref->{$key}[0] $vfile $vfref->{$key}[1]->{$vfile}\n";
-	#	}
-	#}
-	####################################
-	# end of testing #
-	####################################
 	
-	return bless {}, $class;
+	# set $self to [ref_to_allbldev, ref_to_vdevices];
+	$self = [\%allbldev	, \%vdevice];
+	bless $self, $class;
+	return $self;
 }
 
 sub menu {

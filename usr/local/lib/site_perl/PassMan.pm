@@ -9,7 +9,7 @@ package PassMan;
 use Crypt::Blowfish;
 use Crypt::CBC;
 use Crypt::Digest;
-user Term::ReadKey;
+use Term::ReadKey;
 use strict;
 use warnings;
 
