@@ -12,7 +12,7 @@ my $passman;
 my $dataman;
 
 # the version
-my $version = "2.19";
+my $version = "2.20";
 
 # read fstab into array to check for disk mounts in fstab
 # only used in mountveracontainer
@@ -880,7 +880,7 @@ if ($opt_m) {
 		# if it is a vera file or vera mount point or vera disk label -- add it to @vlist
 		# print and error message for unknown command line parameters
 
-		# make a list of all possible vera arguments
+		# make a list of all possible vera arguments that are attached.
 		my @veraargs = (@attachedveralabels, @attachedverafiles, @attachedveramtpts);
 
 		# make a hash of attached bitlocker devices
