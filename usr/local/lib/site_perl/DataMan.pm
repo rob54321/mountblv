@@ -180,14 +180,16 @@ sub add {
 	# then check for duplicate entries
 	#check input: 5 items for vera, 4 items for bitlocker
 	if (($entry[0] eq 'v' and @entry == 5) or ($entry[0] eq 'b' and @entry == 4)) {
-		# check each line of mbldata for a duplicate vera file
+		# check each line of mbldata for a duplicate vera file or vera mount point
 		# or a duplicate bitlocker mount point
-		# for vera:      $entry[3] = verafile
+		# for vera:      $entry[3] = verafile, $entry[4] = vera_mtpt
 		# for bitlocker: $entry[2] = disk mount point
 		my $dupentry = "false";
 		foreach my $line (@mbldata) {
-			if ((($line =~ /^v/) and ($line =~ /:$entry[3]:/))
-			      or (($line =~ /^b/) and ($line =~ /:$entry[2]:/))) {
+			if ((($line =~ /^v/)
+				 and (($line =~ /:$entry[3]:/) or $line =~ /:$entry[4]/))
+			      or (($line =~ /^b/)
+			      and ($line =~ /:$entry[2]:/))) {
 				# duplicate entry found
 				print "\n$vinput is a duplicate entry\n\n";
 				$dupentry = "true";
