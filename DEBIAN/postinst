@@ -4,3 +4,11 @@
 # cpanm will only install if module is not preset.
 # also an updated module will be installed
 cpanm Crypt::CBC Crypt::Blowfish Crypt::Digest Term::ReadKey
+
+# set ownership
+chown robert.robert /home/robert/.mbl.rc
+chown robert.robert /home/robert/.mbldata.rc
+
+# /mnt/ must be set to robert.robert
+# otherwise mounts will not work
+chown robert.robert /mnt

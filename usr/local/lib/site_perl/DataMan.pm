@@ -57,7 +57,7 @@ sub new {
 	# the key is the partuuid
 	# hash format  for each record: partuuid => [mountpoint disk_label]
 	# if mount point is not given then /mnt/drive1, /mnt/drive2, etc will be used
-	%allbldev = ("7f8f684f-78e2-4903-903a-c5d9ab8f36ee" => [qw(/mnt/drivec drivec)]);
+	%allbldev = ("333e0c31-d9f1-40dd-b26e-33f6b820da54" => [qw(/mnt/drivec drivec)]);
 
 	# the hash vdevice contains 
 	# partition label => [drive mountpoint, {verafile => verafile_mountpoint}]
