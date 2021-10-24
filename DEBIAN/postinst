@@ -5,10 +5,14 @@
 # also an updated module will be installed
 cpanm Crypt::CBC Crypt::Blowfish Crypt::Digest Term::ReadKey
 
-# set ownership
-chown robert.robert /home/robert/.mbl.rc
-chown robert.robert /home/robert/.mbldata.rc
+# set ownership to robert.robert if user exists
+groups robert
+if test $? -eq 0; then
+	chown robert.robert /home/robert/.mbl.rc
+	chown robert.robert /home/robert/.mbldata.rc
 
-# /mnt/ must be set to robert.robert
-# otherwise mounts will not work
-chown robert.robert /mnt
+	# /mnt/ must be set to robert.robert
+	# otherwise mounts will not work
+	chown robert.robert /mnt
+fi
+exit 0
