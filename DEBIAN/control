@@ -1,8 +1,8 @@
 Package: mountblv
-Version: 2.25
+Version: 2.26
 Architecture: all
 Maintainer: Robert Key robkey@mighty.co.za
-Depends: perl,libbde-utils, cpanminus, veracrypt | veracrypt-console
+Depends: perl, libbde-utils, cpanminus, veracrypt | veracrypt-console
 Section: myown
 Priority: optional
 Description: This package mounts and unmounts bitlocker drives and veracrypt containers.

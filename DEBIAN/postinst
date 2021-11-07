@@ -5,14 +5,28 @@
 # also an updated module will be installed
 cpanm Crypt::CBC Crypt::Blowfish Crypt::Digest Term::ReadKey
 
+# the mountlbv deb file puts .mbl.rc and .mbldata.rc in
+# /root incase it is a live system which has no
+# /home/robert. Files must be moved to /home/robert
+# if the directory exists and user robert exists.
+# the live system only creates user robert
+# after the first boot. liveinit will move
+# the two files /home/robert which will exist
+# after the first boot.
+
 # set ownership to robert.robert if user exists
 groups robert
 if test $? -eq 0; then
+	# mbl.rc and mbldata must be
+	# moved to home directory
+	mv -vf /root/.mbl.rc /home/robert/
+	mv -vf /root/.mbldata.rc /home/robert/
 	chown robert.robert /home/robert/.mbl.rc
 	chown robert.robert /home/robert/.mbldata.rc
 
 	# /mnt/ must be set to robert.robert
 	# otherwise mounts will not work
 	chown robert.robert /mnt
+	chown robert.robert /mnt/*
 fi
 exit 0
