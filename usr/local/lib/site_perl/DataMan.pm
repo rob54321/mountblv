@@ -62,11 +62,9 @@ sub new {
 	# the hash vdevice contains 
 	# partition label => [drive mountpoint, {verafile => verafile_mountpoint}]
 	%vdevice = ( 
-		 ssd    => ['/mnt/ssd',  {'/mnt/ssd/vera'                => '/mnt/verassd'}]	,
+		 ssd    => ['/mnt/ssd',  {'/mnt/ssd/backups/lynn/vera'   => '/mnt/verassd'}]	,
 		 hd3    => ['/mnt/hd3',  {'/mnt/hd3/backups/lynn/vera'   => '/mnt/verahd3'}]	,
 		 hd2    => ['/mnt/hd2',  {'/mnt/hd2/backups/lynn/vera'   => '/mnt/verahd2'}]	,
-		 hdint  => ['/mnt/hdint',{'/mnt/hdint/backups/lynn/vera' => '/mnt/verahdint'}]	,
-		 win    => ['/mnt/win',  {'/mnt/win/lynn/vera'           => '/mnt/verawin'}]	,
 		 can    => ['/mnt/can',  {'/mnt/can/backups/lynn/vera'   => '/mnt/veracan'}]);
 
 	# if the resource file exists, open and read it
