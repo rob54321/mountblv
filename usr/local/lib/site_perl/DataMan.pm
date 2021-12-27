@@ -148,7 +148,8 @@ sub menu {
 			print "\n";
 		} elsif ($entry eq "e") {
 			# edit file
-			print "editing\n";
+			system("nano $rcfile");
+			#print "editing\n";
 		} else {
 			# unknown entry
 			print "unknown entry\n";
@@ -182,16 +183,31 @@ sub add {
 		# or a duplicate bitlocker mount point
 		# for vera:      $entry[3] = verafile, $entry[4] = vera_mtpt
 		# for bitlocker: $entry[2] = disk mount point
+
+		# entry: v dlabel dmtpt vfile vmtpt
+		# or     b part_uuid dmtpt dlabel
+		
 		my $dupentry = "false";
 		foreach my $line (@mbldata) {
-			if ((($line =~ /^v/)
-				 and (($line =~ /:$entry[3]:/) or $line =~ /:$entry[4]/))
-			      or (($line =~ /^b/)
-			      and ($line =~ /:$entry[2]:/))) {
-				# duplicate entry found
-				print "\n$vinput is a duplicate entry\n\n";
-				$dupentry = "true";
-				last;
+			# check entry for vera file
+			# entry v dlabel dmtpt vera_file vera_mtpt
+			chomp($line);
+			if ($entry[0] eq "v") {
+				if (($line =~ /^v:.*:.*:$entry[3]:.*:$/) or ($line =~ /^v:.*:.*:.*:$entry[4]$/m)) {
+					# duplicate entry found
+					print "\n$vinput is a duplicate entry\n\n";
+					$dupentry = "true";
+					last;
+				}
+			# check entry for bit locker files
+			# entry b partuui dmtpt dlabel
+			} elsif ($entry[0] eq "b") {
+				if (($line =~ /^b:.*:$entry[2]:.*$/) or ($line =~ /^b:.*:.*:$entry[3]$/m)) {
+					# duplicate entry found
+					print "\n$vinput is a duplicate entry\n\n";
+					$dupentry = "true";
+					last;
+				}
 			}
 		} # end foreach $line
 

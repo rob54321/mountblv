@@ -12,7 +12,7 @@ my $passman;
 my $dataman;
 
 # the version
-my $version = "2.261";
+my $version = "2.27";
 
 # read fstab into array to check for disk mounts in fstab
 # only used in mountveracontainer
@@ -362,16 +362,17 @@ sub defaultparameter {
 	}
 } 
 
-# this sub mounts a vera container that is attached
+# this sub mounts a single vera container that is attached
 # and mounts the disk drive if necessary.
 # The mounted container is written to /tmp/verafilelist
 # and the directory created for the mountpoint is written to /tmp/veradirlist
 # The two files are used for unmounting and deleting the created directories
-# the call: mountveracontainer( disk_label, vera_file )
+# the call: mountveracontainer( disk_label, vera_file, disk_mounted_ref, no_vera_files_mounted_ref )
 sub mountveracontainer {
-	my $dlabel = shift;
-	my $verafile = shift;
-
+	# novmounted is the number of vera files mounted
+	# either 0 or 1. This number is returned to mountvera
+	my ($dlabel, $verafile, $diskmountedref, $novmountedref) = @_;
+		
 	# get vera mountpoint
 	my $veramtpt = $vdeviceref->{$dlabel}->[1]->{$verafile};
 	my $dmtpt = $vdeviceref->{$dlabel}->[0];
@@ -398,6 +399,9 @@ sub mountveracontainer {
 			print "mounted $dmtpt, not in fstab\n";
 		}
 			
+		# disk was mounted by mbl.pl
+		$$diskmountedref = 1;
+		
 		# append mountpoint to /tmp/veradrivelist
 		print VDRIVELIST $dmtpt . "\n";
 	}
@@ -419,7 +423,9 @@ sub mountveracontainer {
 			}
 
 			# mount vera file and check if successfull
-              	my $vrc = system("sudo veracrypt -k \"\" --fs-options=uid=robert,gid=robert,umask=007 --pim=0 --protect-hidden=no -p $password $verafile $veramtpt | tee /tmp/veraerror.txt");
+			my $vrc = system("sudo veracrypt -k \"\" --fs-options=uid=robert,gid=robert,umask=007 --pim=0 --protect-hidden=no -p $password $verafile $veramtpt | tee /tmp/veraerror.txt");
+
+			# analyse output from veracrypt
 			if (open VOUT,"<","/tmp/veraerror.txt") {
 				my @vout = <VOUT>;
 				chomp(@vout);
@@ -436,13 +442,16 @@ sub mountveracontainer {
 				close VOUT;
 			}
 
-			printf "%-40s\t\t %s\n", "$verafile", "$veramtpt";		
+			printf "%-40s\t\t %s\n", "$verafile", "$veramtpt";
+			# set the count to one
+			$$novmountedref++;
 		} else {			
 			print "$verafile is already mounted\n";
 		}
 	} else {
 		print "$verafile does not exist\n";
 	}
+	return;
 }
 
 # make lists of attached vera disk labels, vera files and their respective mountpoints
@@ -485,6 +494,15 @@ sub mountvera {
 	# string veralist = all | list of vera mountpoints
 	my @veralist = @_;
 
+	# no of vera files mounted by mountveracontainer.
+	# if zero vera files are mounted from a disk
+	# drive that was mounted by mbl, then it must be umounted
+	my $diskmounted = 0;
+	my $novmounted = 0;
+
+	# disk label containing vera files
+	my $label;
+		
 	# read fstab so disk can be mounted using fstab or not
 	open FILE, "<", "/etc/fstab" or die "cannot open fstab: $!\n";
 	@fstab = <FILE>;
@@ -499,12 +517,23 @@ sub mountvera {
 	# all vera files on all attached labels must be mounted
 	if ($veralist[0] and ($veralist[0] eq "all")) {
 		# mount all devices and all vera containers
-		foreach my $label (@attachedveralabels) {
+		# set counters to zero.
+		# allows un mounting of disk if no vera files were found
+		foreach $label (@attachedveralabels) {
+			$diskmounted = 0;
+			$novmounted = 0;
 			print "\n";
 			# for each label there could be multiple vera containers
 			foreach my $verafile (keys(%{$vdeviceref->{$label}->[1]})) {
-				mountveracontainer($label, $verafile);
+				mountveracontainer($label, $verafile, \$diskmounted, \$novmounted);
 			}
+			# if the disk was mounted and no vera files were found
+			# the disk must be unmounted
+			if ($diskmounted > 0 and $novmounted == 0) {
+				print "No vera files found on $label: unmounting\n";
+				system("umount -v /mnt/$label");
+			}
+			#print "all: disk mounted = $diskmounted : no vfiles mounted = $novmounted\n";
 		}
 	} else {
 		# there is a list of arguments following -v
@@ -515,26 +544,46 @@ sub mountvera {
 				# argument is a disk label
 				# mount all vera files on disk label
 				print "\n";
+				# reset counters, so disk can be umounted
+				# if no vera files found on disk.
+				$diskmounted = 0;
+				$novmounted = 0;
 				foreach my $verafile (keys(%{$vdeviceref->{$arg}->[1]})) {
 					# mount vera file
 					#print "arg is a label = $arg: verafile = $verafile\n";
-					mountveracontainer($arg, $verafile);
-				}
+					mountveracontainer($arg, $verafile, \$diskmounted, \$novmounted);
+				}				
 			} elsif (grep(/^$arg$/, @attachedverafiles)) {
 				#argument is a vera container
-				my $label = getdlabelfromvfile($arg);
+				$label = getdlabelfromvfile($arg);
 				#print "arg is a verafile label = $label: verafile = $arg\n";
-				mountveracontainer($label, $arg);
+				# reset counters, so disk can be umounted
+				# if no vera files found on disk.
+				$diskmounted = 0;
+				$novmounted = 0;
+				mountveracontainer($label, $arg, \$diskmounted, \$novmounted);
 
 			} elsif (grep(/^$arg$/, @attachedveramtpts)) {
 				#argument is a vera mount point
-				my ($label, $verafile) = getlabelvfilefromvmtpt($arg);
+				my $verafile;
+				($label, $verafile) = getlabelvfilefromvmtpt($arg);
 				#print "arg is a vmtpt label = $label: verafile = $verafile\n";
-				mountveracontainer($label, $verafile);
+				# reset counters, so disk can be umounted
+				# if no vera files found on disk.
+				$diskmounted = 0;
+				$novmounted = 0;
+				mountveracontainer($label, $verafile, \$diskmounted, \$novmounted);
 			} else {
 				# unkown argument
 				print "$arg is unknown\n";
 			}
+			# if the disk was mounted and no vera files were found
+			# the disk must be unmounted
+			if ($diskmounted > 0 and $novmounted == 0) {
+				print "No vera files found on $label: unmounting\n";
+				system("umount -v /mnt/$label");
+			}
+			#print "disk mounted = $diskmounted : no vfiles mounted = $novmounted\n";
 		}
 	}
 	close(VDRIVELIST);
