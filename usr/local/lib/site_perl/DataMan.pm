@@ -193,7 +193,12 @@ sub add {
 			# entry v dlabel dmtpt vera_file vera_mtpt
 			chomp($line);
 			if ($entry[0] eq "v") {
-				if (($line =~ /^v:.*:.*:$entry[3]:.*:$/) or ($line =~ /^v:.*:.*:.*:$entry[4]$/m)) {
+				# search for vera_file or vera_mtpt in mbldata.rc
+				# search between :xxx: and end of line $
+				# also search for disk_label or disk_mtpt in mbldata.rc
+				# ONLY in b records.
+				if (($line =~ /:$entry[3]:|:$entry[3]$|:$entry[4]:|:$entry[4]$|
+					^b.*:$entry[1]:|^b.*:$entry[1]$|^b.*:$entry[2]:|^b.*:$entry[2]$/)) {
 					# duplicate entry found
 					print "\n$vinput is a duplicate entry\n\n";
 					$dupentry = "true";
@@ -202,7 +207,7 @@ sub add {
 			# check entry for bit locker files
 			# entry b partuui dmtpt dlabel
 			} elsif ($entry[0] eq "b") {
-				if (($line =~ /^b:.*:$entry[2]:.*$/) or ($line =~ /^b:.*:.*:$entry[3]$/m)) {
+				if (($line =~ /:$entry[2]:|$entry[2]$|:$entry[3]:|:$entry[3]$/)) {
 					# duplicate entry found
 					print "\n$vinput is a duplicate entry\n\n";
 					$dupentry = "true";
